@@ -31,7 +31,7 @@ char* find_ttyusb() {
     int n;
 
     if ((n = scandir("/dev", &namelist, NULL, alphasort)) < 0) {
-        printf("ERROR: find_ttyusb - can't scan dir\n");
+        perror("ERROR: find_ttyusb - can't scan dir\n");
         exit(1);
     }
 
@@ -41,14 +41,14 @@ char* find_ttyusb() {
             if (!device) {
                 device = namelist[n]->d_name;
             } else {
-                printf("ERROR: find_ttyusb - find_ttyusb failed: more than one device\n");
+                perror("ERROR: find_ttyusb - find_ttyusb failed: more than one device\n");
                 exit(1);
             }
         }
     }
 
     if (!device) {
-        printf("ERROR: find_ttyusb - find_ttyusb failed: no devices found\n");
+        perror("ERROR: find_ttyusb - find_ttyusb failed: no devices found\n");
         exit(1);
     }
 
@@ -67,7 +67,7 @@ int open_tty(const char* device) {
     }
 
     if (fd == -1) {
-        printf("ERROR: can't open USB device\n");
+        perror("ERROR: can't open USB device\n");
         exit(1);
     }
 
@@ -78,7 +78,7 @@ int set_tty_to_8n1(int fd, uint32_t speed) {
     struct termios tty;
     memset(&tty, 0, sizeof tty);
     if (tcgetattr (fd, &tty) != 0) {
-        printf("ERROR: set_tty_to_8n1 - tcgetattr failed\n");
+        perror("ERROR: set_tty_to_8n1 - tcgetattr failed\n");
         exit(1);
     }
 
@@ -122,7 +122,7 @@ int set_tty_to_8n1(int fd, uint32_t speed) {
     tty.c_oflag &= ~OPOST;	
 
     if (tcsetattr (fd, TCSANOW, &tty) != 0) {
-        printf("ERROR: can't set tty to 8n1\n");
+        perror("ERROR: can't set tty to 8n1\n");
         exit(1);
     }
 

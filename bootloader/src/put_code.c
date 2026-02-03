@@ -12,7 +12,7 @@ uint32_t wait_for_op(int fd) {
     while (1) {
         uint32_t op = get32(fd);
         if (op == BOOT_ERROR) {
-            printf("BOOT ERROR\n");
+            perror("BOOT ERROR\n");
             exit(1);
         }
         if (op != PRINT_STRING) {
@@ -45,7 +45,7 @@ void put_code(int fd, const uint8_t* bin, uint32_t code_len) {
     while (wait_for_op(fd) != GET_CODE);
     uint32_t crc_rec = get32(fd);
     if (crc_rec != crc) {
-        printf("ERROR: crc received is incorrect\n");
+        perror("ERROR: crc received is incorrect\n");
         exit(1);
     }
 
@@ -58,7 +58,7 @@ void put_code(int fd, const uint8_t* bin, uint32_t code_len) {
     }
 
     if (wait_for_op(fd) != BOOT_SUCCESS) {
-        printf("ERROR: put_code - boot error\n");
+        perror("ERROR: put_code - boot error\n");
         exit(1);
     }
 
