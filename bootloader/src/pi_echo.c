@@ -33,15 +33,6 @@ int pi_done(unsigned char *s) {
     return 0;
 }
 
-void remove_nonprint(uint8_t* buf, int n) {
-    for(int i = 0; i < n; i++) {
-        uint8_t *p = &buf[i];
-        if(isprint(*p) || (isspace(*p) && *p != '\r'))
-            continue;
-        *p = ' ';
-    }
-}
-
 void reset_terminal_mode() {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
 }

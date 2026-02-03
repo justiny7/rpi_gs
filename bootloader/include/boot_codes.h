@@ -1,9 +1,7 @@
 #ifndef BOOT_CODES_H
 #define BOOT_CODES_H
 
-// #define LOOP_DELAY_MS 300
 #define LOOP_DELAY_US 300 * 1000
-// #define LOOP_DELAY_MS 1000
 #define BASE_ADDR 0x8000
 
 enum {
