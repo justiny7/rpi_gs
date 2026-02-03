@@ -12,11 +12,13 @@ void* read_file(uint32_t* size, const char* name) {
     int fd;
     if ((fd = open(name, O_RDONLY)) < 0) {
         perror("ERROR: read_file - can't open file\n");
+        exit(1);
     }
 
     struct stat file_stat;
     if (stat(name, &file_stat) < 0) {
         perror("ERROR: read_file - can't stat file\n");
+        exit(1);
     }
 
     *size = file_stat.st_size;
