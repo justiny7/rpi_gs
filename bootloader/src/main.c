@@ -1,7 +1,5 @@
-#include "uart.h"
+#include "drivers.h"
 #include "lib.h"
-#include "sys_timer.h"
-
 #include "boot_codes.h"
 #include "boot_crc32.h"
 
@@ -69,8 +67,9 @@ void main() {
     }
 
     write32(BOOT_SUCCESS);
-    sys_timer_delay_ms(200);
-    // uart_flush_tx();
+
+    t = sys_timer_get_usec();
+    while (sys_timer_get_usec() - t < 200);
 
     ((void (*)(void)) base_addr)();
 }

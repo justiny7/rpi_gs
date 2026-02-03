@@ -5,7 +5,7 @@ OBJCOPY = arm-none-eabi-objcopy
 
 # Flags
 # Note: Added -Iinclude to CFLAGS_PI to ensure it finds bootloader-specific headers
-CFLAGS_PI  = -mcpu=arm1176jzf-s -fpic -ffreestanding -Wall -Wextra -nostdlib -Iinclude -I../include -I../lib
+CFLAGS_PI  = -mcpu=arm1176jzf-s -fpic -ffreestanding -Wall -Wextra -nostdlib -Iinclude -Ilib
 CFLAGS_MAC = -O2 -Wall -Iinclude
 LDFLAGS    = -T linker.ld -nostdlib
 
@@ -15,10 +15,10 @@ BUILD_PI_DIR  = $(BUILD_DIR)/pi
 BUILD_MAC_DIR = $(BUILD_DIR)/mac
 
 # VPATH allows make to find sources in these directories automatically
-VPATH = src ../src ../src/drivers ../lib
+VPATH = src lib
 
 # Sources
-PI_C_SRCS  = main.c uart.c gpio.c sys_timer.c lib.c
+PI_C_SRCS  = main.c lib.c drivers.c
 PI_S_SRCS  = boot.S lib.S
 MAC_C_SRCS = put_code.c tty_util.c io_util.c pi_echo.c
 
