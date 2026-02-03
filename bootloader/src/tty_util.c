@@ -129,3 +129,8 @@ int set_tty_to_8n1(int fd, uint32_t speed) {
     return fd;
 }
 
+bool tty_disconnected(const char* device) {
+    struct stat s;
+    return stat(device, &s) < 0;
+}
+

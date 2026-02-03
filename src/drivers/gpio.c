@@ -51,10 +51,10 @@ PinOutput gpio_read(Pin pin) {
 }
 
 void gpio_select_input(Pin pin) {
-    gpio_select(pin, PM_INPUT);
+    gpio_select(pin, GPIO_INPUT);
 }
 void gpio_select_output(Pin pin) {
-    gpio_select(pin, PM_OUTPUT);
+    gpio_select(pin, GPIO_OUTPUT);
 }
 
 void gpio_set_low(Pin pin) {

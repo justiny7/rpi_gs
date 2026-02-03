@@ -14,6 +14,7 @@
 #define UART_RX_CNTL_BIT 1 // (1 << 0)
 
 #define UART_TX_READY_BIT 32 // (1 << 5)
+#define UART_TX_EMPTY_BIT 64 // (1 << 6)
 #define UART_RX_READY_BIT 1 // (1 << 0)
 
 // baudrate = system_clock_freq / (8 * (baud_rate_reg + 1))
@@ -49,16 +50,18 @@ void uart_disable_interrupts();
 
 bool _uart_can_getc();
 bool _uart_can_putc();
-unsigned char _uart_getc();
-void _uart_putc(unsigned char c);
+bool _uart_tx_is_empty();
+uint8_t _uart_getc();
+void _uart_putc(uint8_t c);
 
-unsigned char uart_getc();
-void uart_putc(unsigned char c);
+uint8_t uart_getc();
+void uart_putc(uint8_t c);
 void uart_puts(const char* s);
 
 bool uart_can_getc();
 bool uart_can_putc();
 
+bool uart_tx_is_empty();
 void uart_flush_tx();
 
 #endif

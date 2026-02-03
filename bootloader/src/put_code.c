@@ -63,11 +63,5 @@ void put_code(int fd, const uint8_t* bin, uint32_t code_len) {
     }
 
     printf("Boot success!\n");
-    printf("----------- PI OUTPUT ------------\n");
-
-    while (1) {
-        putchar(get8(fd));
-        fflush(stdout);
-    }
 }
 

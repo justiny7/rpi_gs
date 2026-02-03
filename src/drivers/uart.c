@@ -1,13 +1,14 @@
 #include "lib.h"
 #include "gpio.h"
 #include "uart.h"
+
 void uart_init() {
     mem_barrier_dsb();
 
     Pin tx = { UART_TX_PIN };
     Pin rx = { UART_RX_PIN };
-    gpio_select(tx, PM_ALT_FUNC_5);
-    gpio_select(rx, PM_ALT_FUNC_5);
+    gpio_select(tx, GPIO_ALT_FUNC_5);
+    gpio_select(rx, GPIO_ALT_FUNC_5);
 
     // Disable pulls
     gpio_set_pull(tx, GPIO_PULL_OFF);
@@ -65,23 +66,26 @@ bool _uart_can_getc() {
 bool _uart_can_putc() {
     return GET32(AUX_MU_LSR_REG) & UART_TX_READY_BIT;
 }
-unsigned char _uart_getc() {
+bool _uart_tx_is_empty() {
+    return GET32(AUX_MU_LSR_REG) & UART_TX_EMPTY_BIT;
+}
+uint8_t _uart_getc() {
     while (!_uart_can_getc());
     return GET32(AUX_MU_IO_REG) & 0xFF;
 }
-void _uart_putc(unsigned char c) {
+void _uart_putc(uint8_t c) {
     while (!_uart_can_putc());
     PUT32(AUX_MU_IO_REG, (uint32_t) c);
 }
 
-unsigned char uart_getc() {
+uint8_t uart_getc() {
     mem_barrier_dsb();
-    unsigned char res = _uart_getc();
+    uint8_t res = _uart_getc();
     mem_barrier_dsb();
 
     return res;
 }
-void uart_putc(unsigned char c) {
+void uart_putc(uint8_t c) {
     mem_barrier_dsb();
     _uart_putc(c);
     mem_barrier_dsb();
@@ -109,8 +113,14 @@ bool uart_can_putc() {
     return res;
 }
 
+bool uart_tx_is_empty() {
+    mem_barrier_dsb();
+    bool res = _uart_tx_is_empty();
+    mem_barrier_dsb();
+    return res;
+}
 void uart_flush_tx() {
     mem_barrier_dsb();
-    while (_uart_can_putc());
+    while (!_uart_tx_is_empty());
     mem_barrier_dsb();
 }

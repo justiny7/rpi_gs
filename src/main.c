@@ -6,7 +6,6 @@
 #define ITERATIONS 0x500000
 
 void main() {
-    /*
     uart_init();
 
     // const char* s = "Hello world\n";
@@ -25,7 +24,7 @@ void main() {
         // uart_putc(c);
         uart_putc(uart_getc());
     }
-    */
+    /*
     Pin p = { 27 };
     Pin pp = { 20 };
     gpio_select_output(p);
@@ -39,5 +38,6 @@ void main() {
         // gpio_set_low(pp);
         sys_timer_delay_sec(1);
     }
+    */
 }
 

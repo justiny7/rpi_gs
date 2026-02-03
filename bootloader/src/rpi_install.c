@@ -1,6 +1,7 @@
 #include "put_code.h"
 #include "tty_util.h"
 #include "io_util.h"
+#include "pi_echo.h"
 
 #include <stdio.h>
 
@@ -22,6 +23,7 @@ int main(int argc, char* argv[]) {
     printf("Kernel at: %s, code len = %d\n", argv[1], code_len);
 
     put_code(fd, code, code_len);
+    pi_echo(fd, argv[1]);
 
     return 0;
 }

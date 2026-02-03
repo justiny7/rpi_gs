@@ -25,14 +25,14 @@ typedef struct Pin_t {
 } Pin;
 
 typedef enum PinMode_t {
-    PM_INPUT = 0,
-    PM_OUTPUT = 1,
-    PM_ALT_FUNC_0 = 4,
-    PM_ALT_FUNC_1 = 5,
-    PM_ALT_FUNC_2 = 6,
-    PM_ALT_FUNC_3 = 7,
-    PM_ALT_FUNC_4 = 3,
-    PM_ALT_FUNC_5 = 2,
+    GPIO_INPUT = 0,
+    GPIO_OUTPUT = 1,
+    GPIO_ALT_FUNC_0 = 4,
+    GPIO_ALT_FUNC_1 = 5,
+    GPIO_ALT_FUNC_2 = 6,
+    GPIO_ALT_FUNC_3 = 7,
+    GPIO_ALT_FUNC_4 = 3,
+    GPIO_ALT_FUNC_5 = 2,
 } PinMode;
 
 typedef enum PinOutput_t {

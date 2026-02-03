@@ -20,7 +20,7 @@ VPATH = src ../src ../src/drivers ../lib
 # Sources
 PI_C_SRCS  = main.c uart.c gpio.c sys_timer.c lib.c
 PI_S_SRCS  = boot.S lib.S
-MAC_C_SRCS = put_code.c tty_util.c io_util.c
+MAC_C_SRCS = put_code.c tty_util.c io_util.c pi_echo.c
 
 # Objects (Separated by platform directory)
 PI_OBJS  = $(addprefix $(BUILD_PI_DIR)/, $(PI_C_SRCS:.c=.c.o))

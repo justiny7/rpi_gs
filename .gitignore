@@ -1,5 +1,6 @@
 *.img
 *.DS_Store
+*.txt
 
 /build
 bootloader/bin
