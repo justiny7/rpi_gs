@@ -69,7 +69,7 @@ void main() {
     write32(BOOT_SUCCESS);
 
     t = sys_timer_get_usec();
-    while (sys_timer_get_usec() - t < 200);
+    while (sys_timer_get_usec() - t < 500 * 1000);
 
     ((void (*)(void)) base_addr)();
 }

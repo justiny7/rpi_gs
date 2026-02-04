@@ -21,6 +21,7 @@ int main(int argc, char* argv[]) {
     uint32_t code_len;
     uint8_t* code = read_file(&code_len, argv[1]);
     printf("Kernel at: %s, code len = %d\n", argv[1], code_len);
+    fflush(stdout);
 
     put_code(fd, code, code_len);
     pi_echo(fd, argv[1]);

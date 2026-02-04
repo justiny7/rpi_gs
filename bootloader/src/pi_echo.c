@@ -15,21 +15,18 @@ struct termios orig_termios;
 
 // hack-y state machine to indicate when we've seen the special string
 // 'DONE!!!' from the pi telling us to shutdown.
-int pi_done(unsigned char *s) {
-    static unsigned pos = 0;
+int pi_done(uint8_t *s, int n, uint32_t *pos) {
     const char exit_string[] = "DONE!!!\n";
-
-    for(; *s; s++) {
-        if(*s != exit_string[pos++]) {
-            pos = 0;
-            return pi_done(s + 1);
-        }
-
-        if(pos == sizeof(exit_string) - 1) {
-            return 1;
+    for (int i = 0; i < n; i++) {
+        if (s[i] == exit_string[*pos]) {
+            (*pos)++;
+            if (exit_string[*pos] == '\0') {
+                return 1;
+            }
+        } else {
+            *pos = (s[i] == exit_string[0]) ? 1 : 0;
         }
     }
-
     return 0;
 }
 
@@ -72,6 +69,9 @@ void pi_echo(int pi_fd, const char* device) {
     set_terminal_raw_mode();
 
     printf("\r\n----------- PI OUTPUT ------------\r\n");
+    fflush(stdout);
+
+    uint32_t done_pos = 0;
     while (1) {
         if (poll(fds, 2, -1) < 0) {
             perror("Poll error\n");
@@ -89,7 +89,7 @@ void pi_echo(int pi_fd, const char* device) {
 
             write_clean_output(STDOUT_FILENO, buf, n);
 
-            if (pi_done(buf)) {
+            if (pi_done(buf, n, &done_pos)) {
                 printf("\r\n---------- PROGRAM DONE ----------\r\n");
                 exit(0);
             }

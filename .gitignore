@@ -2,6 +2,5 @@
 *.DS_Store
 *.txt
 
-/build
-bootloader/bin
-bootloader/build
+**/build
+**/bin

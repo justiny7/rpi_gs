@@ -37,7 +37,7 @@ kernel.img: $(BUILD_DIR)/kernel.elf
 	$(OBJCOPY) $< -O binary $@
 
 $(BUILD_DIR)/kernel.elf: $(OBJS) $(LIB_OBJS)
-	$(CC) $(LDFLAGS) $(OBJS) $(LIB_OBJS) -o $@
+	$(CC) $(LDFLAGS) $(OBJS) $(LIB_OBJS) -lgcc -o $@
 
 # asm rules
 $(BUILD_DIR)/%.S.o: %.S

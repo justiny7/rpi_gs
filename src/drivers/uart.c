@@ -100,6 +100,14 @@ void uart_puts(const char* s) {
     }
     mem_barrier_dsb();
 }
+void uart_putk(const char* s) {
+    mem_barrier_dsb();
+    while (*s) {
+        _uart_putc(*s++);
+    }
+    mem_barrier_dsb();
+}
+
 bool uart_can_getc() {
     mem_barrier_dsb();
     bool res = _uart_can_getc();

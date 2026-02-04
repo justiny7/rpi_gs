@@ -6,6 +6,10 @@
 #define ITERATIONS 0x500000
 
 void main() {
+    Pin p = { 20 };
+    gpio_event_clear(p);
+
+    /*
     uart_init();
 
     // const char* s = "Hello world\n";
@@ -24,6 +28,7 @@ void main() {
         // uart_putc(c);
         uart_putc(uart_getc());
     }
+    */
     /*
     Pin p = { 27 };
     Pin pp = { 20 };

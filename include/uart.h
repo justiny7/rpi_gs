@@ -57,6 +57,7 @@ void _uart_putc(uint8_t c);
 uint8_t uart_getc();
 void uart_putc(uint8_t c);
 void uart_puts(const char* s);
+void uart_putk(const char* s);
 
 bool uart_can_getc();
 bool uart_can_putc();

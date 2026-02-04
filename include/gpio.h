@@ -2,6 +2,7 @@
 #define GPIO_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #define MAX_PIN_NUM 53
 
@@ -16,8 +17,18 @@ enum {
     GPSET_BASE = GPIO_BASE + 0x001C,
     GPCLR_BASE = GPIO_BASE + 0x0028,
     GPLEV_BASE = GPIO_BASE + 0x0034,
+    GPEDS_BASE = GPIO_BASE + 0x0040,
+    GPREN_BASE = GPIO_BASE + 0x004C,
+    GPFEN_BASE = GPIO_BASE + 0x0058,
     GPPUD_BASE = GPIO_BASE + 0x0094,
     GPPUDCLK_BASE = GPIO_BASE + 0x0098,
+};
+
+enum {
+    INT_PENDING_2 = 0x2000B208,
+    INT_ENABLE_2 = 0x2000B214,
+    GPIO_INT_0 = 49,
+    GPIO_INT_1 = 50,
 };
 
 typedef struct Pin_t {
@@ -57,6 +68,12 @@ void gpio_set_low(Pin pin);
 void gpio_set_high(Pin pin);
 
 void gpio_set_pull(Pin pin, GpioPull pull);
+
+bool gpio_has_interrupt();
+void gpio_enable_int_rising_edge(Pin pin);
+void gpio_enable_int_falling_edge(Pin pin);
+bool gpio_event_detected(Pin pin);
+void gpio_event_clear(Pin pin);
 
 #endif
 

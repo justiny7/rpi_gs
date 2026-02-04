@@ -2,12 +2,21 @@
 #include "gpio.h"
 #include "sys_timer.h"
 
-void gpio_select(Pin pin, PinMode mode) {
+#include "uart.h"
+
+uint32_t _check_pin(Pin pin) {
     const uint32_t p_num = pin.p_num;
     if (p_num > MAX_PIN_NUM) {
-        return;
+        return -1;
+        // exit(1);
         // gpio_panic("illegal pin=%d\n", p_num);
     }
+
+    return p_num;
+}
+
+void gpio_select(Pin pin, PinMode mode) {
+    const uint32_t p_num = _check_pin(pin);
     if((mode & 0b111) != mode) {
         return;
         // gpio_panic("illegal func=%x\n", mode);
@@ -25,11 +34,7 @@ void gpio_select(Pin pin, PinMode mode) {
 }
 
 void gpio_set(Pin pin, PinOutput value) {
-    const uint32_t p_num = pin.p_num;
-    if (p_num > MAX_PIN_NUM) {
-        return;
-        // gpio_panic("illegal pin=%d\n", p_num);
-    }
+    const uint32_t p_num = _check_pin(pin);
 
     const uint32_t register_base = (value == LOW ? GPCLR_BASE : GPSET_BASE);
     const uint32_t register_offset = (p_num >> 5) * REG_SIZE_BYTES;
@@ -39,10 +44,7 @@ void gpio_set(Pin pin, PinOutput value) {
 }
 
 PinOutput gpio_read(Pin pin) {
-    const uint32_t p_num = pin.p_num;
-    if (p_num > MAX_PIN_NUM) {
-        // gpio_panic("illegal pin=%d\n", p_num);
-    }
+    const uint32_t p_num = _check_pin(pin);
 
     const uint32_t offset = (p_num >> 5) * REG_SIZE_BYTES;
     const uint32_t shift = p_num & 31;
@@ -65,10 +67,7 @@ void gpio_set_high(Pin pin) {
 }
 
 void gpio_set_pull(Pin pin, GpioPull pull) {
-    const uint32_t p_num = pin.p_num;
-    if (p_num > MAX_PIN_NUM) {
-        return;
-    }
+    const uint32_t p_num = _check_pin(pin);
 
     const uint32_t offset = REG_SIZE_BYTES * (p_num >> 5);
     const uint32_t shift = p_num & 31;
@@ -81,3 +80,63 @@ void gpio_set_pull(Pin pin, GpioPull pull) {
     PUT32(GPPUDCLK_BASE + offset, 0);
 }
 
+bool gpio_has_interrupt() {
+    mem_barrier_dsb();
+    bool res = GET32(INT_PENDING_2) & (1U << (GPIO_INT_0 - 32));
+    mem_barrier_dsb();
+    return res;
+}
+
+void gpio_enable_int(Pin pin) {
+    const uint32_t p_num = _check_pin(pin);
+
+    mem_barrier_dsb();
+    PUT32(INT_ENABLE_2, (1U << (GPIO_INT_0 + (p_num >= 32) - 32)));
+    mem_barrier_dsb();
+}
+void gpio_enable_int_rising_edge(Pin pin) {
+    const uint32_t p_num = _check_pin(pin);
+
+    const uint32_t register_offset = (p_num >> 5) * REG_SIZE_BYTES;
+    const uint32_t val_bit = 1U << (p_num & 31);
+
+    mem_barrier_dsb();
+
+    OR32(GPREN_BASE + register_offset, val_bit);
+
+    gpio_enable_int(pin);
+}
+void gpio_enable_int_falling_edge(Pin pin) {
+    const uint32_t p_num = _check_pin(pin);
+
+    const uint32_t register_offset = (p_num >> 5) * REG_SIZE_BYTES;
+    const uint32_t val_bit = 1U << (p_num & 31);
+
+    mem_barrier_dsb();
+
+    OR32(GPFEN_BASE + register_offset, val_bit);
+
+    gpio_enable_int(pin);
+}
+bool gpio_event_detected(Pin pin) {
+    const uint32_t p_num = _check_pin(pin);
+
+    const uint32_t offset = (p_num >> 5) * REG_SIZE_BYTES;
+    const uint32_t shift = p_num & 31;
+
+    mem_barrier_dsb();
+    bool res = (GET32(GPEDS_BASE + offset) >> shift) & 1;
+    mem_barrier_dsb();
+
+    return res;
+}
+void gpio_event_clear(Pin pin) {
+    const uint32_t p_num = _check_pin(pin);
+
+    const uint32_t register_offset = (p_num >> 5) * REG_SIZE_BYTES;
+    const uint32_t val_bit = 1U << (p_num & 31);
+
+    mem_barrier_dsb();
+    PUT32(GPEDS_BASE + register_offset, val_bit);
+    mem_barrier_dsb();
+}
