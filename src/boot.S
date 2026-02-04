@@ -37,8 +37,11 @@ _interrupt_table:
     ldr pc, =prefetch_abort_vector
     ldr pc, =data_abort_vector
     ldr pc, =reset_vector
-    ldr pc, =interrupt_vector
+    ldr pc, interrupt_handler_ptr
     ldr pc, =fast_interrupt_vector
+
+.global interrupt_handler_ptr
+interrupt_handler_ptr: .word interrupt_vector
 
 reset_vector:
     bl halt

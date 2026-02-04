@@ -36,7 +36,7 @@ void print_int(uint32_t x) {
     }
 }
 
-void __attribute__((interrupt("IRQ"))) interrupt_vector() {
+void __attribute__((interrupt("IRQ"))) gpio_interrupt_vector() {
     if (gpio_has_interrupt()) {
         if (gpio_event_detected(p)) {
             uint32_t now = sys_timer_get_usec();
@@ -55,6 +55,9 @@ void __attribute__((interrupt("IRQ"))) interrupt_vector() {
 }
 
 void main() {
+    extern uint32_t interrupt_handler_ptr;
+    interrupt_handler_ptr = (uint32_t) gpio_interrupt_vector;
+
     gpio_enable_int_rising_edge(p);
     gpio_enable_int_falling_edge(p);
 
