@@ -19,6 +19,7 @@
 
 // baudrate = system_clock_freq / (8 * (baud_rate_reg + 1))
 // so 250MHz / (8 * 115200 BR)) - 1 = ~270
+#define UART_BAUDRATE 115200
 #define UART_BAUDRATE_PRESCALE 270
 // #define UART_BAUDRATE_PRESCALE 3254 // for 9600 baudrate
 
@@ -40,6 +41,8 @@ enum {
 
 void uart_init();
 void uart_set_baudrate(uint32_t baudrate_reg);
+void uart_set_baudrate_to_clock(uint32_t clock_rate);
+void uart_set_baudrate_to_core_clock();
 
 void uart_enable();
 void uart_rx_enable();
@@ -58,6 +61,9 @@ uint8_t uart_getc();
 void uart_putc(uint8_t c);
 void uart_puts(const char* s);
 void uart_putk(const char* s);
+void uart_putd(uint32_t x);
+void uart_putx(uint32_t x);
+void uart_putb(uint32_t x);
 
 bool uart_can_getc();
 bool uart_can_putc();

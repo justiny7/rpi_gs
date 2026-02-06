@@ -2,6 +2,7 @@
 #define LIB_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 void PUT32(uint32_t addr, uint32_t val);
 uint32_t GET32(uint32_t addr);
@@ -14,5 +15,8 @@ void mem_barrier_dsb();
 void mem_barrier_dmb();
 
 void rpi_reboot();
+void rpi_reset();
+
+void assert(bool val, const char* msg);
 
 #endif

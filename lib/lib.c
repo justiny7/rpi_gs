@@ -12,3 +12,16 @@ void rpi_reboot() {
     PUT32(PM_WDOG, PM_PASSWORD | 1);
     PUT32(PM_RSTC, PM_PASSWORD | PM_RSTC_WRCFG_FULL_RESET);
 }
+void rpi_reset() {
+    uart_putk("\r\nDONE!!!\n");
+    rpi_reboot();
+}
+
+void assert(bool val, const char* msg) {
+    if (!val) {
+        uart_puts("\n[ERROR] Assertion failed: ");
+        uart_puts(msg);
+        rpi_reset();
+    }
+}
+

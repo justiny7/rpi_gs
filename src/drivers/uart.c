@@ -1,6 +1,7 @@
 #include "lib.h"
 #include "gpio.h"
 #include "uart.h"
+#include "mailbox_interface.h"
 
 void uart_init() {
     mem_barrier_dsb();
@@ -40,6 +41,15 @@ void uart_init() {
 
 void uart_set_baudrate(uint32_t baudrate_reg) {
     PUT32(AUX_MU_BAUD_REG, baudrate_reg);
+}
+void uart_set_baudrate_to_clock(uint32_t clock_rate) {
+    uint32_t baudrate_reg = clock_rate / (8 * UART_BAUDRATE) - 1;
+    mem_barrier_dsb();
+    PUT32(AUX_MU_BAUD_REG, baudrate_reg);
+    mem_barrier_dsb();
+}
+void uart_set_baudrate_to_core_clock() {
+    uart_set_baudrate_to_clock(mbox_get_measured_clock_rate(MBOX_CLK_CORE));
 }
 
 void uart_enable() {
@@ -104,6 +114,44 @@ void uart_putk(const char* s) {
     mem_barrier_dsb();
     while (*s) {
         _uart_putc(*s++);
+    }
+    mem_barrier_dsb();
+}
+void uart_putd(uint32_t x) {
+    mem_barrier_dsb();
+    if (x == 0) {
+        _uart_putc('0');
+        return;
+    }
+
+    uint8_t num[10] = {};
+    int i = -1;
+    for (; x > 0; x /= 10) {
+        num[++i] = '0' + (x % 10);
+    }
+    while (i >= 0) {
+        _uart_putc(num[i--]);
+    }
+    mem_barrier_dsb();
+}
+void uart_putx(uint32_t x) {
+    mem_barrier_dsb();
+    _uart_putc('0');
+    _uart_putc('x');
+    for (int i = 7 * 4; i >= 0; i -= 4) {
+        uint32_t d = (x >> i) & 0xF;
+        _uart_putc(d + ((d < 10) ? '0' : ('A' - 10)));
+    }
+    mem_barrier_dsb();
+}
+void uart_putb(uint32_t x) {
+    mem_barrier_dsb();
+    _uart_putc('0');
+    _uart_putc('b');
+    for (int i = 31; i >= 0; i--) {
+        if ((1U << i) <= x) {
+            _uart_putc('0' + ((x >> i) & 1));
+        }
     }
     mem_barrier_dsb();
 }

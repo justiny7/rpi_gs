@@ -31,11 +31,11 @@ enum {
     GPIO_INT_1 = 50,
 };
 
-typedef struct Pin_t {
+typedef struct {
     uint32_t p_num;
 } Pin;
 
-typedef enum PinMode_t {
+typedef enum {
     GPIO_INPUT = 0,
     GPIO_OUTPUT = 1,
     GPIO_ALT_FUNC_0 = 4,
@@ -46,12 +46,12 @@ typedef enum PinMode_t {
     GPIO_ALT_FUNC_5 = 2,
 } PinMode;
 
-typedef enum PinOutput_t {
+typedef enum {
     LOW,
     HIGH,
 } PinOutput;
 
-typedef enum GpioPull_t {
+typedef enum {
     GPIO_PULL_OFF,
     GPIO_PULL_DOWN,
     GPIO_PULL_UP,

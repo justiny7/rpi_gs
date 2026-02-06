@@ -29,6 +29,7 @@ halt:
     b halt
 
 
+.p2align 5
 .global _interrupt_table
 _interrupt_table:
     ldr pc, =reset_vector
