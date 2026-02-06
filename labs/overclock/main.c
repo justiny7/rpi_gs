@@ -89,10 +89,10 @@ void main() {
     uart_puts("Original...\n");
     gpio_test();
 
-    uart_puts("Setting ARM to max...\n");
-    gpio_test_clock(MBOX_CLK_ARM);
     uart_puts("Setting CORE to max...\n");
     gpio_test_clock(MBOX_CLK_CORE);
+    uart_puts("Setting ARM to max...\n");
+    gpio_test_clock(MBOX_CLK_ARM);
     uart_puts("Setting UART to max...\n");
     gpio_test_clock(MBOX_CLK_UART);
 

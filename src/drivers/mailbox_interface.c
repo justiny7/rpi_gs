@@ -117,6 +117,6 @@ uint32_t mbox_get_min_clock_rate(uint32_t clock_id) {
 }
 void mbox_set_clock_rate(uint32_t clock_id, uint32_t clock_rate) {
     assert(mbox_get_property_batch(6,
-        MBOX_TAG_SET_CLOCK_RATE, 12, 0, clock_id, clock_rate, 1
+        MBOX_TAG_SET_CLOCK_RATE, 12, 0, clock_id, clock_rate, 1 // skip turbo by default
     ), "Set clock rate failed");
 }
