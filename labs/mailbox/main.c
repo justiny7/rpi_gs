@@ -11,11 +11,11 @@ void main() {
     uart_putx(mbox_get_board_revision());
     uart_puts("\n");
 
-    uart_puts("Board mem: ");
+    uart_puts("ARM mem: ");
     uart_putd(mbox_get_arm_memory());
     uart_puts("\n");
 
-    uart_puts("Board mem: ");
+    uart_puts("GPU mem: ");
     uart_putd(mbox_get_vc_memory());
     uart_puts("\n");
 
