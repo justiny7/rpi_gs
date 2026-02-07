@@ -87,36 +87,208 @@ uint32_t mbox_get_max_temp() {
 
 
 /* CLOCK */
-uint32_t mbox_get_clock_rate(uint32_t clock_id) {
+uint32_t mbox_get_clock_rate(MboxClock clock_id) {
     assert(mbox_get_property_batch(5,
         MBOX_TAG_GET_CLOCK_RATE, 8, 0, clock_id, 0
     ), "Get clock rate failed");
 
     return mbox_buf[6];
 }
-uint32_t mbox_get_measured_clock_rate(uint32_t clock_id) {
+uint32_t mbox_get_measured_clock_rate(MboxClock clock_id) {
     assert(mbox_get_property_batch(5,
         MBOX_TAG_GET_CLOCK_RATE_MEASURED, 8, 0, clock_id, 0
     ), "Get measured clock rate failed");
 
     return mbox_buf[6];
 }
-uint32_t mbox_get_max_clock_rate(uint32_t clock_id) {
+uint32_t mbox_get_max_clock_rate(MboxClock clock_id) {
     assert(mbox_get_property_batch(5,
         MBOX_TAG_GET_MAX_CLOCK_RATE, 8, 0, clock_id, 0
     ), "Get max clock rate failed");
 
     return mbox_buf[6];
 }
-uint32_t mbox_get_min_clock_rate(uint32_t clock_id) {
+uint32_t mbox_get_min_clock_rate(MboxClock clock_id) {
     assert(mbox_get_property_batch(5,
         MBOX_TAG_GET_MIN_CLOCK_RATE, 8, 0, clock_id, 0
     ), "Get min clock rate failed");
 
     return mbox_buf[6];
 }
-void mbox_set_clock_rate(uint32_t clock_id, uint32_t clock_rate) {
+void mbox_set_clock_rate(MboxClock clock_id, uint32_t clock_rate) {
     assert(mbox_get_property_batch(6,
         MBOX_TAG_SET_CLOCK_RATE, 12, 0, clock_id, clock_rate, 1 // skip turbo by default
     ), "Set clock rate failed");
+}
+
+/* MEMORY */
+uint32_t mbox_allocate_memory(uint32_t size, uint32_t alignment, uint32_t flags) {
+    assert(mbox_get_property_batch(6,
+        MBOX_TAG_ALLOCATE_MEMORY, 12, 0, size, alignment, flags
+    ), "Allocate GPU memory failed");
+
+    return mbox_buf[5];
+}
+uint32_t mbox_lock_memory(uint32_t handle) {
+    assert(mbox_get_property_batch(4,
+        MBOX_TAG_LOCK_MEMORY, 4, 0, handle
+    ), "Lock GPU memory failed");
+
+    return mbox_buf[5];
+}
+uint32_t mbox_unlock_memory(uint32_t handle) {
+    assert(mbox_get_property_batch(4,
+        MBOX_TAG_UNLOCK_MEMORY, 4, 0, handle
+    ), "Unlock GPU memory failed");
+
+    return mbox_buf[5];
+}
+uint32_t mbox_release_memory(uint32_t handle) {
+    assert(mbox_get_property_batch(4,
+        MBOX_TAG_RELEASE_MEMORY, 4, 0, handle
+    ), "Release GPU memory failed");
+
+    return mbox_buf[5];
+}
+
+
+/* FRAME BUFFER */
+void mbox_allocate_framebuffer(uint32_t alignment, uint32_t** base_addr, uint32_t* buf_size) {
+    assert(mbox_get_property_batch(5,
+        MBOX_TAG_ALLOCATE_FRAMEBUFFER, 8, 0, alignment, 0
+    ), "Allocate framebuffer failed");
+
+    *base_addr = (uint32_t*) mbox_buf[5];
+    *buf_size = mbox_buf[6];
+}
+void mbox_release_framebuffer() {
+    assert(mbox_get_property_batch(3,
+        MBOX_TAG_RELEASE_FRAMEBUFFER, 0, 0
+    ), "Release framebuffer failed");
+}
+uint32_t mbox_framebuffer_blank_screen(uint32_t state) {
+    assert(mbox_get_property_batch(4,
+        MBOX_TAG_BLANK_SCREEN, 4, 0, state
+    ), "Framebuffer blank screen failed");
+
+    return mbox_buf[5];
+}
+
+void mbox_framebuffer_get_physical_width_height(uint32_t* width, uint32_t* height) {
+    assert(mbox_get_property_batch(5,
+        MBOX_TAG_GET_PHYSICAL_WIDTH_HEIGHT, 8, 0, 0, 0
+    ), "Get framebuffer physical width/height failed");
+
+    *width = mbox_buf[5];
+    *height = mbox_buf[6];
+}
+void mbox_framebuffer_get_virtual_width_height(uint32_t* width, uint32_t* height) {
+    assert(mbox_get_property_batch(5,
+        MBOX_TAG_GET_VIRTUAL_WIDTH_HEIGHT, 8, 0, 0, 0
+    ), "Get framebuffer virtual width/height failed");
+
+    *width = mbox_buf[5];
+    *height = mbox_buf[6];
+}
+uint32_t mbox_framebuffer_get_depth() {
+    assert(mbox_get_property_batch(4,
+        MBOX_TAG_GET_DEPTH, 4, 0, 0
+    ), "Framebuffer get depth failed");
+
+    return mbox_buf[5];
+}
+PixelOrder mbox_framebuffer_get_pixel_order() {
+    assert(mbox_get_property_batch(4,
+        MBOX_TAG_GET_PIXEL_ORDER, 4, 0, 0
+    ), "Framebuffer get pixel order failed");
+
+    return mbox_buf[5];
+}
+AlphaMode mbox_framebuffer_get_alpha_mode() {
+    assert(mbox_get_property_batch(4,
+        MBOX_TAG_GET_ALPHA_MODE, 4, 0, 0
+    ), "Framebuffer get alpha mode failed");
+
+    return mbox_buf[5];
+}
+uint32_t mbox_framebuffer_get_pitch() {
+    assert(mbox_get_property_batch(4,
+        MBOX_TAG_GET_PITCH, 4, 0, 0
+    ), "Framebuffer get pitch (bytes per line) failed");
+
+    return mbox_buf[5];
+}
+void mbox_framebuffer_get_virtual_offset(uint32_t* offset_x, uint32_t* offset_y) {
+    assert(mbox_get_property_batch(5,
+        MBOX_TAG_GET_VIRTUAL_OFFSET, 8, 0, 0, 0
+    ), "Get framebuffer virtual offset failed");
+
+    *offset_x = mbox_buf[5];
+    *offset_y = mbox_buf[6];
+}
+void mbox_framebuffer_get_overscan(uint32_t* top, uint32_t* bottom, uint32_t* left, uint32_t* right) {
+    assert(mbox_get_property_batch(7,
+        MBOX_TAG_GET_OVERSCAN, 16, 0, 0, 0, 0, 0
+    ), "Get framebuffer overscan failed");
+
+    *top = mbox_buf[5];
+    *bottom = mbox_buf[6];
+    *left = mbox_buf[7];
+    *right = mbox_buf[8];
+}
+void mbox_framebuffer_get_palette() {
+    // unimplemented
+}
+
+void mbox_framebuffer_set_physical_width_height(uint32_t width, uint32_t height) {
+    assert(mbox_get_property_batch(5,
+        MBOX_TAG_SET_PHYSICAL_WIDTH_HEIGHT, 8, 0, width, height
+    ), "Set framebuffer physical width/height failed");
+}
+void mbox_framebuffer_set_virtual_width_height(uint32_t width, uint32_t height) {
+    assert(mbox_get_property_batch(5,
+        MBOX_TAG_SET_VIRTUAL_WIDTH_HEIGHT, 8, 0, width, height
+    ), "Set framebuffer virtual width/height failed");
+}
+void mbox_framebuffer_set_depth(uint32_t depth) {
+    assert(mbox_get_property_batch(4,
+        MBOX_TAG_SET_DEPTH, 4, 0, depth
+    ), "Framebuffer set depth failed");
+}
+void mbox_framebuffer_set_pixel_order(PixelOrder pixel_order) {
+    assert(mbox_get_property_batch(4,
+        MBOX_TAG_SET_PIXEL_ORDER, 4, 0, pixel_order
+    ), "Framebuffer set pixel order failed");
+}
+void mbox_framebuffer_set_alpha_mode(AlphaMode alpha_mode) {
+    assert(mbox_get_property_batch(4,
+        MBOX_TAG_SET_ALPHA_MODE, 4, 0, alpha_mode
+    ), "Framebuffer set alpha mode failed");
+}
+void mbox_framebuffer_set_virtual_offset(uint32_t offset_x, uint32_t offset_y) {
+    assert(mbox_get_property_batch(5,
+        MBOX_TAG_SET_VIRTUAL_OFFSET, 8, 0, offset_x, offset_y
+    ), "Set framebuffer virtual offset failed");
+}
+void mbox_framebuffer_set_overscan(uint32_t top, uint32_t bottom, uint32_t left, uint32_t right) {
+    assert(mbox_get_property_batch(7,
+        MBOX_TAG_SET_OVERSCAN, 16, 0, top, bottom, left, right
+    ), "Set framebuffer overscan failed");
+}
+void mbox_framebuffer_set_palette() {
+    // unimplemented
+}
+
+
+/* QPU */
+uint32_t mbox_execute_gpu() {
+    // unimplemented
+    return 0;
+}
+uint32_t mbox_set_enable_qpu(uint32_t enable) {
+    assert(mbox_get_property_batch(4,
+        MBOX_TAG_SET_ENABLE_QPU, 4, 0, enable
+    ), "Enable QPU failed");
+
+    return mbox_buf[5];
 }

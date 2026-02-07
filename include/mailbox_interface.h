@@ -120,7 +120,7 @@ typedef enum {
 
     /* SD Card */
     /* VHCIQ */
-} MboxTags;
+} MboxTag;
 
 typedef enum {
     MBOX_CLK_EMMC = 0x00000001,
@@ -137,7 +137,29 @@ typedef enum {
     MBOX_CLK_EMMC2,
     MBOX_CLK_M2MC,
     MBOX_CLK_PIXEL_BVB,
-} MboxClocks;
+} MboxClock;
+
+typedef enum {
+    MEM_FLAG_DISCARDABLE      = 1 << 0, /* can be resized to 0 at any time. Use for cached data */
+    MEM_FLAG_NORMAL           = 0 << 2, /* normal allocating alias. Don't use from ARM */
+    MEM_FLAG_DIRECT           = 1 << 2, /* 0xC alias uncached */
+    MEM_FLAG_COHERENT         = 2 << 2, /* 0x8 alias. Non-allocating in L2 but coherent */
+    MEM_FLAG_L1_NONALLOCATING = (MEM_FLAG_DIRECT | MEM_FLAG_COHERENT), /* Allocating in L2 */
+    MEM_FLAG_ZERO             = 1 << 4,  /* initialise buffer to all zeros */
+    MEM_FLAG_NO_INIT          = 1 << 5, /* don't initialise (default is initialise to all ones */
+    MEM_FLAG_HINT_PERMALOCK   = 1 << 6, /* Likely to be locked for long periods of time. */
+} MboxGPUFlag;
+
+typedef enum {
+    PIXEL_ORDER_BGR,
+    PIXEL_ORDER_RGB,
+} PixelOrder;
+
+typedef enum {
+    ALPHA_ENABLED,   // 0 = fully opaque
+    ALPHA_REVERSED,  // 0 = fully transparent
+    ALPHA_IGNORED,
+} AlphaMode;
 
 /* GENERAL */
 bool mbox_get_property(uint32_t* msg);
@@ -155,10 +177,41 @@ uint32_t mbox_get_temp();
 uint32_t mbox_get_max_temp();
 
 /* CLOCKS */
-uint32_t mbox_get_clock_rate(uint32_t clock_id);
-uint32_t mbox_get_measured_clock_rate(uint32_t clock_id);
-uint32_t mbox_get_max_clock_rate(uint32_t clock_id);
-uint32_t mbox_get_min_clock_rate(uint32_t clock_id);
-void mbox_set_clock_rate(uint32_t clock_id, uint32_t clock_rate);
+uint32_t mbox_get_clock_rate(MboxClock clock_id);
+uint32_t mbox_get_measured_clock_rate(MboxClock clock_id);
+uint32_t mbox_get_max_clock_rate(MboxClock clock_id);
+uint32_t mbox_get_min_clock_rate(MboxClock clock_id);
+void mbox_set_clock_rate(MboxClock clock_id, uint32_t clock_rate);
 
+/* MEMORY */
+uint32_t mbox_allocate_memory(uint32_t size, uint32_t alignment, uint32_t flags);
+uint32_t mbox_lock_memory(uint32_t handle);
+uint32_t mbox_unlock_memory(uint32_t handle);
+uint32_t mbox_release_memory(uint32_t handle);
+
+/* FRAME BUFFER */
+void mbox_allocate_framebuffer(uint32_t alignment, uint32_t** base_addr, uint32_t* buf_size);
+void mbox_release_framebuffer();
+void mbox_framebuffer_get_physical_width_height(uint32_t* width, uint32_t* height);
+void mbox_framebuffer_get_virtual_width_height(uint32_t* width, uint32_t* height);
+uint32_t mbox_framebuffer_get_depth();
+PixelOrder mbox_framebuffer_get_pixel_order();
+AlphaMode mbox_framebuffer_get_alpha_mode();
+uint32_t mbox_framebuffer_get_pitch();
+void mbox_framebuffer_get_virtual_offset(uint32_t* offset_x, uint32_t* offset_y);
+void mbox_framebuffer_get_overscan(uint32_t* top, uint32_t* bottom, uint32_t* left, uint32_t* right);
+// void mbox_framebuffer_get_palette();
+
+void mbox_framebuffer_set_physical_width_height(uint32_t width, uint32_t height);
+void mbox_framebuffer_set_virtual_width_height(uint32_t width, uint32_t height);
+void mbox_framebuffer_set_depth(uint32_t depth);
+void mbox_framebuffer_set_pixel_order(PixelOrder pixel_order);
+void mbox_framebuffer_set_alpha_mode(AlphaMode alpha_mode);
+void mbox_framebuffer_set_virtual_offset(uint32_t offset_x, uint32_t offset_y);
+void mbox_framebuffer_set_overscan(uint32_t top, uint32_t bottom, uint32_t left, uint32_t right);
+// void mbox_framebuffer_set_palette();
+
+/* QPU */
+// uint32_t mbox_execute_gpu();
+uint32_t mbox_set_enable_qpu(uint32_t enable);
 #endif
