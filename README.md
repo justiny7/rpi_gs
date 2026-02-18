@@ -1,2 +1,2 @@
-### Bare Metal OS on a Raspberry Pi Zero W
-Originally for Stanford CS 140E but from scratch with my own modifications
+### Gaussian Splatting on a Raspberry Pi Zero W
+Stanford CS 140E final project
