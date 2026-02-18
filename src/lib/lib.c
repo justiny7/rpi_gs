@@ -25,3 +25,7 @@ void assert(bool val, const char* msg) {
     }
 }
 
+int errno;
+int* __errno() {
+    return &errno;
+}

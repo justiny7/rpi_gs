@@ -5,19 +5,20 @@ LD      = arm-none-eabi-ld
 OBJCOPY = arm-none-eabi-objcopy
 
 # flags
-CFLAGS  = -mcpu=arm1176jzf-s -fpic -ffreestanding -O2 -Wall -Wextra -nostdlib -Iinclude -Ilib
+CFLAGS  = -mcpu=arm1176jzf-s -fpic -ffreestanding -O2 -Wall -Wextra -nostdlib -Iinclude
 ASFLAGS = -mcpu=arm1176jzf-s
 LDFLAGS = -T linker.ld -nostdlib
 
 # directories
 SRC_DIR   = src
 DRV_DIR   = src/drivers
-LIB_DIR = lib
+STARTUP_DIR = src/startup
+LIB_DIR = src/lib
 BUILD_DIR = build
 
 # sources
-SRCS_C = $(wildcard $(SRC_DIR)/*.c) $(wildcard $(DRV_DIR)/*.c)
-SRCS_S = $(wildcard $(SRC_DIR)/*.S)
+SRCS_C = $(wildcard $(SRC_DIR)/*.c) $(wildcard $(DRV_DIR)/*.c) $(wildcard $(STARTUP_DIR)/*.c)
+SRCS_S = $(wildcard $(SRC_DIR)/*.S) $(wildcard $(STARTUP_DIR)/*.S)
 SRCS_LIB_C = $(wildcard $(LIB_DIR)/*.c)
 SRCS_LIB_S = $(wildcard $(LIB_DIR)/*.S)
 
@@ -37,7 +38,7 @@ kernel.img: $(BUILD_DIR)/kernel.elf
 	$(OBJCOPY) $< -O binary $@
 
 $(BUILD_DIR)/kernel.elf: $(OBJS) $(LIB_OBJS)
-	$(CC) $(LDFLAGS) $(OBJS) $(LIB_OBJS) -lgcc -o $@
+	$(CC) $(LDFLAGS) $(OBJS) $(LIB_OBJS) -lm -lgcc -o $@
 
 # asm rules
 $(BUILD_DIR)/%.S.o: %.S
