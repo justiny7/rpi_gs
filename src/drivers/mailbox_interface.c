@@ -154,6 +154,84 @@ uint32_t mbox_release_memory(uint32_t handle) {
 
 
 /* FRAME BUFFER */
+
+// Combined framebuffer init - sets all properties in one mailbox call
+bool mbox_framebuffer_init(uint32_t width, uint32_t height, uint32_t depth,
+                           uint32_t** fb_ptr, uint32_t* fb_size, uint32_t* pitch) {
+    // Build a combined message with all framebuffer setup tags
+    uint32_t __attribute__((aligned(16))) msg[36];
+    
+    uint32_t i = 0;
+    msg[i++] = 0;  // Size (filled later)
+    msg[i++] = MBOX_REQUEST;
+    
+    // Set physical width/height
+    msg[i++] = MBOX_TAG_SET_PHYSICAL_WIDTH_HEIGHT;
+    msg[i++] = 8;   // value buffer size
+    msg[i++] = 0;   // request code
+    msg[i++] = width;
+    msg[i++] = height;
+    
+    // Set virtual width/height
+    msg[i++] = MBOX_TAG_SET_VIRTUAL_WIDTH_HEIGHT;
+    msg[i++] = 8;
+    msg[i++] = 0;
+    msg[i++] = width;
+    msg[i++] = height;
+    
+    // Set virtual offset (0,0)
+    msg[i++] = MBOX_TAG_SET_VIRTUAL_OFFSET;
+    msg[i++] = 8;
+    msg[i++] = 0;
+    msg[i++] = 0;
+    msg[i++] = 0;
+    
+    // Set depth
+    msg[i++] = MBOX_TAG_SET_DEPTH;
+    msg[i++] = 4;
+    msg[i++] = 0;
+    msg[i++] = depth;
+    
+    // Set pixel order (BGR)
+    msg[i++] = MBOX_TAG_SET_PIXEL_ORDER;
+    msg[i++] = 4;
+    msg[i++] = 0;
+    msg[i++] = PIXEL_ORDER_BGR;
+    
+    // Allocate framebuffer
+    msg[i++] = MBOX_TAG_ALLOCATE_FRAMEBUFFER;
+    msg[i++] = 8;
+    msg[i++] = 0;
+    uint32_t fb_idx = i;
+    msg[i++] = 16;  // alignment
+    msg[i++] = 0;   // size (output)
+    
+    // Get pitch
+    msg[i++] = MBOX_TAG_GET_PITCH;
+    msg[i++] = 4;
+    msg[i++] = 0;
+    uint32_t pitch_idx = i;
+    msg[i++] = 0;   // pitch (output)
+    
+    // End tag
+    msg[i++] = 0;
+    
+    // Set message size
+    msg[0] = i * sizeof(uint32_t);
+    
+    // Send message
+    if (!mbox_get_property(msg)) {
+        return false;
+    }
+    
+    // Extract results
+    *fb_ptr = (uint32_t*)msg[fb_idx];
+    *fb_size = msg[fb_idx + 1];
+    *pitch = msg[pitch_idx];
+    
+    return (*fb_ptr != 0 && *pitch != 0);
+}
+
 void mbox_allocate_framebuffer(uint32_t alignment, uint32_t** base_addr, uint32_t* buf_size) {
     assert(mbox_get_property_batch(5,
         MBOX_TAG_ALLOCATE_FRAMEBUFFER, 8, 0, alignment, 0

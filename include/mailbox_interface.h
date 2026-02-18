@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdarg.h>
 
-#define MBOX_BUFFER_SIZE 32
+#define MBOX_BUFFER_SIZE 64
 
 enum {
     MBOX_REQUEST = 0,
@@ -190,6 +190,8 @@ uint32_t mbox_unlock_memory(uint32_t handle);
 uint32_t mbox_release_memory(uint32_t handle);
 
 /* FRAME BUFFER */
+bool mbox_framebuffer_init(uint32_t width, uint32_t height, uint32_t depth, 
+                           uint32_t** fb_ptr, uint32_t* fb_size, uint32_t* pitch);
 void mbox_allocate_framebuffer(uint32_t alignment, uint32_t** base_addr, uint32_t* buf_size);
 void mbox_release_framebuffer();
 void mbox_framebuffer_get_physical_width_height(uint32_t* width, uint32_t* height);
