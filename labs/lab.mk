@@ -15,27 +15,27 @@ CC      := arm-none-eabi-gcc
 AS      := arm-none-eabi-as
 OBJCOPY := arm-none-eabi-objcopy
 
-# flags
-CFLAGS  := -mcpu=arm1176jzf-s -fpic -ffreestanding -O2 -Wall -Wextra -nostdlib \
-           -I$(OS_ROOT)/include -I$(OS_ROOT)/lib
-ASFLAGS := -mcpu=arm1176jzf-s
-LDFLAGS := -T $(OS_ROOT)/linker.ld -nostdlib
+# flags (with FPU support)
+CFLAGS  := -mcpu=arm1176jzf-s -mfloat-abi=hard -mfpu=vfp -fpic -ffreestanding -O2 -Wall -Wextra -nostdlib -I$(OS_ROOT)/include
+ASFLAGS := -mcpu=arm1176jzf-s -mfpu=vfp
+LDFLAGS := -T $(OS_ROOT)/linker.ld -nostdlib -mfloat-abi=hard -mfpu=vfp
 
 # build directory (local to lab)
 BUILD_DIR := build
 
-# OS sources
-OS_SRC_DIR := $(OS_ROOT)/src
-OS_DRV_DIR := $(OS_ROOT)/src/drivers
-OS_LIB_DIR := $(OS_ROOT)/lib
+# OS source directories
+OS_SRC_DIR     := $(OS_ROOT)/src
+OS_DRV_DIR     := $(OS_ROOT)/src/drivers
+OS_STARTUP_DIR := $(OS_ROOT)/src/startup
+OS_LIB_DIR     := $(OS_ROOT)/src/lib
 
-OS_SRCS_C := $(wildcard $(OS_SRC_DIR)/*.c) $(wildcard $(OS_DRV_DIR)/*.c)
-OS_SRCS_S := $(wildcard $(OS_SRC_DIR)/*.S)
+# OS sources
+OS_SRCS_C := $(wildcard $(OS_DRV_DIR)/*.c) $(wildcard $(OS_STARTUP_DIR)/*.c)
+OS_SRCS_S := $(wildcard $(OS_STARTUP_DIR)/*.S)
+
+# lib sources
 LIB_SRCS_C := $(wildcard $(OS_LIB_DIR)/*.c)
 LIB_SRCS_S := $(wildcard $(OS_LIB_DIR)/*.S)
-
-# filter out the default main.c from OS sources
-OS_SRCS_C := $(filter-out $(OS_SRC_DIR)/main.c, $(OS_SRCS_C))
 
 # OS objects
 OS_OBJS := \
@@ -64,7 +64,7 @@ $(KERNEL): $(BUILD_DIR)/kernel.elf
 	$(OBJCOPY) $< -O binary $@
 
 $(BUILD_DIR)/kernel.elf: $(ALL_OBJS)
-	$(CC) $(LDFLAGS) $(ALL_OBJS) -lgcc -o $@
+	$(CC) $(LDFLAGS) $(ALL_OBJS) -o $@
 
 # compile OS .S files
 $(BUILD_DIR)/%.S.o: $(OS_ROOT)/%.S

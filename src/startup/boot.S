@@ -16,8 +16,24 @@ bss_loop:
     b bss_loop
 
 bss_done:
+    # enable access to CP10 and CP11
+    mrc p15, 0, r0, c1, c0, 2
+    orr r0, r0, #(0xF << 20)
+    mcr p15, 0, r0, c1, c0, 2
+
+    # prefetch buffer
     mov r0, #0
     mcr p15, 0, r0, c7, c5, 4
+
+    # enable VFP (set EN bit 30)
+    mov r0, #(1 << 30)
+    fmxr fpexc, r0
+
+    # prefetch buffer
+    mov r0, #0
+    mcr p15, 0, r0, c7, c5, 4
+
+    # load interrupt table
     ldr r0, =_interrupt_table
     mcr p15, 0, r0, c12, c0, 0
     cpsie i

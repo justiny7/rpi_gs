@@ -38,6 +38,11 @@ void main() {
             } else {
                 pixel_ptr[idx] = 0x00FFFFFF;
             }
+
+            if (i + j % 100 == 0) {
+                uart_putx(pixel_ptr[idx]);
+                uart_puts("\n");
+            }
         }
     }
 

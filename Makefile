@@ -5,9 +5,12 @@ LD      = arm-none-eabi-ld
 OBJCOPY = arm-none-eabi-objcopy
 
 # flags
-CFLAGS  = -mcpu=arm1176jzf-s -fpic -ffreestanding -O2 -Wall -Wextra -nostdlib -Iinclude
-ASFLAGS = -mcpu=arm1176jzf-s
-LDFLAGS = -T linker.ld -nostdlib
+CFLAGS  = -mcpu=arm1176jzf-s -mfloat-abi=hard -mfpu=vfp -fpic -ffreestanding -O2 -Wall -Wextra -nostdlib -Iinclude
+ASFLAGS = -mcpu=arm1176jzf-s -mfpu=vfp
+LDFLAGS = -T linker.ld -nostdlib -mfloat-abi=hard -mfpu=vfp
+
+# CFLAGS  = -mcpu=arm1176jzf-s -fpic -ffreestanding -O2 -Wall -Wextra -nostdlib -Iinclude
+# ASFLAGS = -mcpu=arm1176jzf-s
 
 # directories
 SRC_DIR   = src
