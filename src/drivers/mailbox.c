@@ -1,6 +1,8 @@
 #include "mailbox.h"
 #include "lib.h"
 
+#include "uart.h"
+
 void mbox_write(MboxChannel channel, uint32_t data) {
     while (GET32(MBOX_STATUS) & MBOX_FULL_BIT);
     PUT32(MBOX_WRITE, (data & ~0xF) | (channel & 0xF) | GPU_L2_OFFSET);

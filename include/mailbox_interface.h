@@ -212,6 +212,6 @@ void mbox_framebuffer_set_overscan(uint32_t top, uint32_t bottom, uint32_t left,
 // void mbox_framebuffer_set_palette();
 
 /* QPU */
-// uint32_t mbox_execute_gpu();
+// uint32_t mbox_execute_qpu(uint32_t num_gpus, uint32_t control, uint32_t noflush, uint32_t timeout);
 uint32_t mbox_set_enable_qpu(uint32_t enable);
 #endif

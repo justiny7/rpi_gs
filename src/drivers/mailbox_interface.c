@@ -11,6 +11,7 @@ bool mbox_get_property(uint32_t* msg) {
     mem_barrier_dsb();
     mbox_write(MB_TAGS_ARM_TO_VC, addr);
     mbox_read(MB_TAGS_ARM_TO_VC);
+
     mem_barrier_dsb();
     return msg[1] == MBOX_REQUEST_SUCCESS;
 }
@@ -281,9 +282,12 @@ void mbox_framebuffer_set_palette() {
 
 
 /* QPU */
-uint32_t mbox_execute_gpu() {
-    // unimplemented
-    return 0;
+uint32_t mbox_execute_gpu(uint32_t num_qpus, uint32_t control, uint32_t noflush, uint32_t timeout) { // doesn't seem to work...
+    assert(mbox_get_property_batch(7,
+        MBOX_TAG_EXECUTE_QPU, 16, 0, num_qpus, control, noflush, timeout
+    ), "Execute QPU failed");
+
+    return mbox_buf[5];
 }
 uint32_t mbox_set_enable_qpu(uint32_t enable) {
     assert(mbox_get_property_batch(4,
