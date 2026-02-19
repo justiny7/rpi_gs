@@ -24,6 +24,23 @@ void assert(bool val, const char* msg) {
         rpi_reset();
     }
 }
+void panic(const char* msg) {
+    uart_puts("\n[PANIC] ");
+    uart_puts(msg);
+    rpi_reset();
+}
+
+void* memcpy(void* dst, const void* src, uint32_t n) {
+    uint8_t* d = (uint8_t*) dst;
+    const uint8_t* s = (const uint8_t*) src;
+    while (n--) *d++ = *s++;
+    return dst;
+}
+void* memset(void* dst, int val, uint32_t n) {
+    uint8_t* d = (uint8_t*) dst;
+    while (n--) *d++ = (uint8_t) val;
+    return dst;
+}
 
 int errno;
 int* __errno() {

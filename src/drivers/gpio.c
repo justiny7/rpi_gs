@@ -6,21 +6,14 @@
 
 uint32_t _check_pin(Pin pin) {
     const uint32_t p_num = pin.p_num;
-    if (p_num > MAX_PIN_NUM) {
-        return -1;
-        // exit(1);
-        // gpio_panic("illegal pin=%d\n", p_num);
-    }
+    assert(p_num <= MAX_PIN_NUM, "Illegal GPIO pin");
 
     return p_num;
 }
 
 void gpio_select(Pin pin, PinMode mode) {
     const uint32_t p_num = _check_pin(pin);
-    if((mode & 0b111) != mode) {
-        return;
-        // gpio_panic("illegal func=%x\n", mode);
-    }
+    assert((mode & 0b111) == mode, "Invalid GPIO mode");
     
     const uint32_t register_offset = REG_SIZE_BYTES * (p_num / 10);
     const uint32_t register_base = GPFSEL_BASE + register_offset;
