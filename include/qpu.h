@@ -1,14 +1,15 @@
 #ifndef QPU_H
 #define QPU_H
 
+#include "mailbox.h"
 #include <stdint.h>
 
 // V3D spec: http://www.broadcom.com/docs/support/videocore/VideoCoreIV-AG100-R.pdf
 #define V3D_BASE 0x20C00000
 
 #define PAGE_SIZE 4096
-#define TO_CPU(ptr) ((uint32_t) ptr & ~GPU_L2_OFFSET)
-#define TO_BUS(ptr) ((uint32_t) ptr | GPU_L2_OFFSET)
+#define TO_CPU(ptr) ((uint32_t) (ptr) & ~GPU_L2_OFFSET)
+#define TO_BUS(ptr) ((uint32_t) (ptr) | GPU_L2_OFFSET)
 
 enum {
     V3D_L2CACTL = V3D_BASE + 0x0020,
@@ -22,6 +23,7 @@ enum {
 };
 
 uint32_t qpu_init(uint32_t num_bytes);
+void qpu_free(uint32_t handle);
 void qpu_execute(uint32_t num_qpus, uint32_t* mail);
 
 #endif

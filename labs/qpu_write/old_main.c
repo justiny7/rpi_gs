@@ -20,48 +20,71 @@ QPU i is in charge of element i. It's given:
 #include "lib.h"
 #include "uart.h"
 #include "sys_timer.h"
-#include "arena_allocator.h"
-#include "kernel.h"
 
 #include "qpu_code.h"
+#include "debug.h"
 
 #define NUM_QPUS 16
-#define NUM_UNIFS 3
 #define ITERATIONS 10000
 #define SIMD_WIDTH 16
 #define N (ITERATIONS * NUM_QPUS * SIMD_WIDTH)
 #define ELEMS_PER_QPU (ITERATIONS * SIMD_WIDTH)
 
 typedef struct {
-    Arena arena;
-    Kernel kernel;
+    uint32_t output[N] __attribute__((aligned(16)));
 
-    volatile uint32_t* output;
+    uint32_t unif[NUM_QPUS][3];
+    uint32_t code[sizeof(qpu_code) / sizeof(qpu_code[0])] __attribute__((aligned(8)));
+
+    uint32_t mbox_msg[NUM_QPUS * 2];
 } GPU;
 
 void main() {
     uint32_t t;
 
-    uint32_t output_len = N * sizeof(uint32_t);
+    DEBUG_D(sizeof(GPU));
+    uint32_t gpu_ptr = qpu_init(sizeof(GPU));
+    volatile GPU* ptr = (volatile GPU*) TO_CPU(gpu_ptr);
 
-    GPU gpu;
-    kernel_init(&gpu.kernel,
-            NUM_QPUS, NUM_UNIFS,
-            qpu_code, sizeof(qpu_code));
+    memcpy((void*) ptr->code, qpu_code, sizeof(ptr->code));
 
-    arena_init(&gpu.arena, N * sizeof(uint32_t));
-    gpu.output = arena_alloc_align(&gpu.arena, output_len, 16);
+    /*
+    for (int i = 0; i < N; i++) {
+        uart_putx(ptr->output[i]);
+        uart_puts(" ");
+
+        if (i % ELEMS_PER_QPU == ELEMS_PER_QPU - 1) {
+            uart_puts("\n");
+        }
+    }
+
+    uart_puts("\n----------------\n\n");
+    */
 
     for (uint32_t i = 0; i < NUM_QPUS; i++) {
-        kernel_load_unif(&gpu.kernel, i, 0, TO_BUS(gpu.output) + i * ELEMS_PER_QPU * sizeof(uint32_t));
-        kernel_load_unif(&gpu.kernel, i, 1, ITERATIONS / 4);
-        kernel_load_unif(&gpu.kernel, i, 2, i);
+        ptr->unif[i][0] = TO_BUS(ptr->output) + i * ELEMS_PER_QPU * sizeof(uint32_t);
+        ptr->unif[i][1] = ITERATIONS / 4;
+        ptr->unif[i][2] = i;
+        DEBUG_X(ptr->unif[i][0]);
+        DEBUG_D(ptr->unif[i][1]);
+        DEBUG_D(ptr->unif[i][2]);
+
+        ptr->mbox_msg[i * 2] = TO_BUS(ptr->unif + i);
+        ptr->mbox_msg[i * 2 + 1] = TO_BUS(ptr->code);
+        DEBUG_X(ptr->mbox_msg[i * 2]);
+        DEBUG_X(ptr->mbox_msg[i * 2 + 1]);
     }
+
+    DEBUG_X(ptr->output);
+    DEBUG_X(ptr->unif);
+    DEBUG_X(ptr->mbox_msg);
+    DEBUG_X(ptr->code);
+
 
     mem_barrier_dsb();
 
     t = sys_timer_get_usec();
-    kernel_execute(&gpu.kernel);
+    qpu_execute(NUM_QPUS, (uint32_t*) ptr->mbox_msg);
     uint32_t gpu_us = sys_timer_get_usec() - t;
 
     uart_puts("GPU time: ");
@@ -91,7 +114,7 @@ void main() {
 
     /*
     for (int i = 0; i < N; i++) {
-        uart_putd(gpu.output[i]);
+        uart_putd(ptr->output[i]);
         uart_puts(" ");
 
         if (i % ELEMS_PER_QPU == ELEMS_PER_QPU - 1) {
@@ -101,8 +124,9 @@ void main() {
     */
 
     for (int i = 0; i < N; i++) {
-        assert(arr[i] == gpu.output[i], "mismatch");
+        assert(arr[i] == ptr->output[i], "mismatch");
     }
+
 
     rpi_reset();
 }

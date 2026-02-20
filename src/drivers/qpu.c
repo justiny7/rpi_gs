@@ -9,11 +9,17 @@ uint32_t qpu_init(uint32_t num_bytes) {
 
     uint32_t handle = mbox_allocate_memory(num_bytes, PAGE_SIZE, MEM_FLAG_L1_NONALLOCATING);
     if (!handle) {
-        assert(mbox_set_enable_qpu(0), "Failed QPU disable");
+        assert(!mbox_set_enable_qpu(0), "Failed QPU disable");
         panic("Can't allocate memory");
     }
 
     return mbox_lock_memory(handle);
+}
+
+void qpu_free(uint32_t handle) {
+    mbox_release_memory(handle);
+    mbox_unlock_memory(handle);
+    assert(!mbox_set_enable_qpu(0), "Failed QPU disable");
 }
 
 void qpu_execute(uint32_t num_qpus, uint32_t* mail) {
