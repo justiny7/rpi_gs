@@ -16,7 +16,7 @@ AS      := arm-none-eabi-as
 OBJCOPY := arm-none-eabi-objcopy
 
 # flags (with FPU support)
-CFLAGS  := -mcpu=arm1176jzf-s -mfloat-abi=hard -mfpu=vfp -fpic -ffreestanding -O2 -Wall -Wextra -nostdlib -I$(OS_ROOT)/include
+CFLAGS  := -mcpu=arm1176jzf-s -mfloat-abi=hard -mfpu=vfp -fpic -ffreestanding -O2 -Wall -Wextra -nostdlib -I$(OS_ROOT)/include -I$(OS_ROOT)/src/kernels
 ASFLAGS := -mcpu=arm1176jzf-s -mfpu=vfp
 LDFLAGS := -T $(OS_ROOT)/linker.ld -nostdlib -mfloat-abi=hard -mfpu=vfp
 
@@ -28,14 +28,18 @@ OS_SRC_DIR     := $(OS_ROOT)/src
 OS_DRV_DIR     := $(OS_ROOT)/src/drivers
 OS_STARTUP_DIR := $(OS_ROOT)/src/startup
 OS_LIB_DIR     := $(OS_ROOT)/src/lib
+OS_KERNEL_DIR  := $(OS_ROOT)/src/kernels
 
-# OS sources
-OS_SRCS_C := $(wildcard $(OS_DRV_DIR)/*.c) $(wildcard $(OS_STARTUP_DIR)/*.c)
+# OS sources (including qasm-generated .c files)
+OS_SRCS_QASM := $(wildcard $(OS_KERNEL_DIR)/*.qasm)
+OS_SRCS_C := $(wildcard $(OS_DRV_DIR)/*.c) $(wildcard $(OS_STARTUP_DIR)/*.c) $(OS_SRCS_QASM:.qasm=.c)
 OS_SRCS_S := $(wildcard $(OS_STARTUP_DIR)/*.S)
 
 # lib sources
 LIB_SRCS_C := $(wildcard $(OS_LIB_DIR)/*.c)
 LIB_SRCS_S := $(wildcard $(OS_LIB_DIR)/*.S)
+
+.PRECIOUS: $(OS_KERNEL_DIR)/%.c
 
 # OS objects
 OS_OBJS := \
@@ -80,6 +84,11 @@ $(BUILD_DIR)/%.c.o: $(OS_ROOT)/%.c
 $(BUILD_DIR)/lab/%.c.o: %.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OS_KERNEL_DIR)/%.c $(OS_KERNEL_DIR)/%.h &: $(OS_KERNEL_DIR)/%.qasm
+	/opt/homebrew/opt/vc4asm/bin/vc4asm -h $(OS_KERNEL_DIR)/$*.h -c $(OS_KERNEL_DIR)/$*.c $<
+
+$(OS_OBJS): $(OS_SRCS_QASM:$(OS_KERNEL_DIR)/%.qasm=$(OS_KERNEL_DIR)/%.h)
 
 clean:
 	rm -rf $(BUILD_DIR) $(KERNEL)
