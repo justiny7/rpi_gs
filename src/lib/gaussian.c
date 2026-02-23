@@ -108,3 +108,4 @@ void precompute_gaussians(Camera* c, Gaussian* g, ProjectedGaussian* pg, uint32_
         pg[i].opacity = g[i].opacity;
     }
 }
+

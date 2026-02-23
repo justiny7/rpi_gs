@@ -5,6 +5,8 @@
 #include "camera.h"
 #include <stdint.h>
 
+#define MAX_GAUSSIANS 50000
+
 // SH coefficients as static const to avoid QEMU .rodata loading issues
 static const float SH_C0 = 0.28209479177387814f;
 static const float SH_C1 = 0.4886025119029199f;
@@ -35,12 +37,57 @@ typedef struct {
 } Gaussian;
 
 typedef struct {
+    Vec3 pos[MAX_GAUSSIANS];
+    Vec3 scale[MAX_GAUSSIANS];
+    Vec4 rot[MAX_GAUSSIANS];
+    Vec3 sh[MAX_GAUSSIANS][16];
+} GaussianSoA;
+
+typedef struct {
+    float pos_x[MAX_GAUSSIANS];
+    float pos_y[MAX_GAUSSIANS];
+    float pos_z[MAX_GAUSSIANS];
+    float scale_x[MAX_GAUSSIANS];
+    float scale_y[MAX_GAUSSIANS];
+    float scale_z[MAX_GAUSSIANS];
+    float rot_x[MAX_GAUSSIANS];
+    float rot_y[MAX_GAUSSIANS];
+    float rot_z[MAX_GAUSSIANS];
+    float rot_w[MAX_GAUSSIANS];
+    float sh_x[MAX_GAUSSIANS][16];
+    float sh_y[MAX_GAUSSIANS][16];
+    float sh_z[MAX_GAUSSIANS][16];
+} GaussianK;
+
+typedef struct {
     float screen_x, screen_y;
     float depth;
     Vec3 cov2d_inv;
     Vec3 color;
     float opacity;
 } ProjectedGaussian;
+
+typedef struct {
+    float screen_x[MAX_GAUSSIANS];
+    float screen_y[MAX_GAUSSIANS];
+    float depth[MAX_GAUSSIANS];
+    Vec3 cov2d_inv[MAX_GAUSSIANS];
+    Vec3 color[MAX_GAUSSIANS];
+    float opacity[MAX_GAUSSIANS];
+} ProjectedGaussianSoA;
+
+typedef struct {
+    float screen_x[MAX_GAUSSIANS];
+    float screen_y[MAX_GAUSSIANS];
+    float depth[MAX_GAUSSIANS];
+    float cov2d_inv_x[MAX_GAUSSIANS];
+    float cov2d_inv_y[MAX_GAUSSIANS];
+    float cov2d_inv_z[MAX_GAUSSIANS];
+    float color_r[MAX_GAUSSIANS];
+    float color_g[MAX_GAUSSIANS];
+    float color_b[MAX_GAUSSIANS];
+    float opacity[MAX_GAUSSIANS];
+} ProjectedGaussianK;
 
 Vec3 eval_sh(Vec3 pos, Vec3* sh, Vec3 cam_pos);
 Mat3 compute_cov3d(Vec3 scale, Vec4 rot);

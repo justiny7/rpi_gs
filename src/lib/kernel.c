@@ -2,17 +2,22 @@
 #include "qpu.h"
 #include "lib.h"
 
+#include "debug.h"
 void kernel_init(Kernel* kernel,
         uint32_t num_qpus, uint32_t num_unifs,
         uint32_t* code, uint32_t code_size) {
     uint32_t total_size = code_size +
         num_qpus * num_unifs * sizeof(uint32_t) + // code
         num_qpus * 2 * sizeof(uint32_t) +         // unifs
+        num_qpus * sizeof(uint32_t) +             // unif counter
         48;                                       // padding
+
     arena_init(&kernel->arena, total_size);
 
     kernel->num_qpus = num_qpus;
     kernel->num_unifs = num_unifs;
+    kernel->cur_unif = arena_alloc(&kernel->arena, num_qpus * sizeof(uint32_t));
+    memset(kernel->cur_unif, 0, num_qpus * sizeof(uint32_t));
 
     kernel->code = arena_alloc_align(&kernel->arena, code_size, 8);
     kernel->unif = arena_alloc_align(&kernel->arena, num_qpus * num_unifs * sizeof(uint32_t), 16);
@@ -34,15 +39,15 @@ void kernel_free(Kernel* kernel) {
     arena_free(&kernel->arena);
 }
 
-void kernel_load_unif_float(Kernel* kernel, uint32_t qpu, uint32_t unif_idx, float val) {
+void kernel_load_unif_f(Kernel* kernel, uint32_t qpu, float val) {
     assert(qpu < kernel->num_qpus, "Load to invalid QPU");
-    assert(unif_idx < kernel->num_unifs, "Load to invalid unif index");
-    memcpy(&kernel->unif[qpu * kernel->num_unifs + unif_idx], &val, sizeof(float));
+    assert(kernel->cur_unif[qpu] < kernel->num_unifs, "Loading too many unifs");
+    memcpy(&kernel->unif[qpu * kernel->num_unifs + kernel->cur_unif[qpu]++], &val, sizeof(float));
 }
 
-void kernel_load_unif_u32(Kernel* kernel, uint32_t qpu, uint32_t unif_idx, uint32_t val) {
+void kernel_load_unif_d(Kernel* kernel, uint32_t qpu, uint32_t val) {
     assert(qpu < kernel->num_qpus, "Load to invalid QPU");
-    assert(unif_idx < kernel->num_unifs, "Load to invalid unif index");
-    memcpy(&kernel->unif[qpu * kernel->num_unifs + unif_idx], &val, sizeof(float));
+    assert(kernel->cur_unif[qpu] < kernel->num_unifs, "Loading too many unifs");
+    memcpy(&kernel->unif[qpu * kernel->num_unifs + kernel->cur_unif[qpu]++], &val, sizeof(float));
 }
 

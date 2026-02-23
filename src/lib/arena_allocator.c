@@ -5,10 +5,10 @@
 #include <stdalign.h>
 #include <stddef.h>
 
+// align must be power of 2
 void* align_ptr(void* ptr, uint32_t align) {
     uint32_t ptr_val = (uint32_t) ptr;
-    uint32_t rem = ptr_val % align;
-    return (rem == 0) ? ptr : ((void*) (ptr_val + align - rem));
+    return (void*) ((ptr_val + align - 1) & ~(align - 1));
 }
 
 void arena_init(Arena* arena, uint32_t num_bytes) {

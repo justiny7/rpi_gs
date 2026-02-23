@@ -1,4 +1,5 @@
 #include "camera.h"
+#include "lib.h"
 #include "math.h"
 
 void init_camera(Camera* c, Vec3 pos, Vec3 target, Vec3 up, uint32_t width, uint32_t height) {
@@ -38,6 +39,11 @@ void project_point(Camera* c, Vec3 p, float* depth, float* u, float* v) {
     float tx = c->w2c.m[0] * p.x + c->w2c.m[1] * p.y + c->w2c.m[2] * p.z + c->w2c.m[3];
     float ty = c->w2c.m[4] * p.x + c->w2c.m[5] * p.y + c->w2c.m[6] * p.z + c->w2c.m[7];
     float tz = c->w2c.m[8] * p.x + c->w2c.m[9] * p.y + c->w2c.m[10] * p.z + c->w2c.m[11];
+    if (tz >= 0 && tz < 0.001) {
+        panic("SMALL POS");
+    } else if (tz <= 0 && tz > -0.001) {
+        panic("SMALL NEG");
+    }
 
     *u = (c->fx * tx / tz) + c->cx;
     *v = (c->fy * ty / tz) + c->cy;
