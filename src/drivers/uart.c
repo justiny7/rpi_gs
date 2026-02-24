@@ -155,6 +155,27 @@ void uart_putb(uint32_t x) {
     }
     mem_barrier_dsb();
 }
+void uart_putf(float x) {
+    uart_putf_precision(x, 3);
+}
+void uart_putf_precision(float x, uint32_t precision) {
+    if (x < 0) {
+        uart_putc('-');
+        x = -x;
+    }
+
+    uint32_t whole = (uint32_t) x;
+    uart_putd(whole);
+    uart_putc('.');
+
+    float frac = x - (float) whole;
+    while (precision--) {
+        frac *= 10;
+        uint32_t d = (uint32_t) frac;
+        uart_putc('0' + d);
+        frac -= (float) d;
+    }
+}
 
 bool uart_can_getc() {
     mem_barrier_dsb();

@@ -14,12 +14,11 @@
 
 .set base_row, ra6          # (qpu_num * 3)
 .set ptr_stride_len, rb3 # (stride * sizeof(float))
+.set loop_counter, rb4
 
 .set tx_reg, ra7
 .set ty_reg, ra8
 .set tz_reg, ra9
-
-.set loop_counter, rb4
 
 .set w2c0, ra10
 .set w2c1, rb5
@@ -69,59 +68,53 @@ mov cx, unif
 mov fy, unif
 mov cy, unif
 
-# loop counter (qpu_num += stride until >= NUM_GAUSSIANS)
-mov loop_counter, qpu_num
-
-# pointer stride length
-mul24 ptr_stride_len, stride, 4
-
-.macro mem_to_vpm_vec16, addr_reg, row_reg, offset
+.macro mem_to_vpm_vec16, addr_reg, offset
     # read 1 row of length 16 at VPM row [offset]
     mov r0, vdr_setup_0(1, 16, 1, vdr_h32(1, offset, 0))
 
-    # shift by 4 to switch to [row_reg]'th row, add to vr_setup
-    shl r1, row_reg, 4
+    # shift by 4 to switch to [base_row]'th row, add to vr_setup
+    shl r1, base_row, 4
     add vr_setup, r0, r1
 
-    # read [addr_reg] into ([row_reg] + [offset])'th row of VPM
+    # read [addr_reg] into ([base_row] + [offset])'th row of VPM
     mov vr_addr, addr_reg
     mov -, vr_wait
 .endm
 
-.macro vpm_to_mem_vec16, addr_reg, row_reg, offset
+.macro vpm_to_mem_vec16, addr_reg, offset
     # write 1 row of length 16 at VPM row [offset]
     mov r0, vdw_setup_0(1, 16, dma_h32(offset, 0))
 
-    # shift by 7 to switch to [row_reg]'th row, add to vw_setup
-    shl r1, row_reg, 7
+    # shift by 7 to switch to [base_row]'th row, add to vw_setup
+    shl r1, base_row, 7
     add vw_setup, r0, r1
 
-    # write ([row_reg + [offset])'th row of VPM into [addr_reg]
+    # write ([base_row + [offset])'th row of VPM into [addr_reg]
     mov vw_addr, addr_reg
     mov -, vw_wait
 .endm
 
-.macro reg_to_vpm_vec16, src_reg, row_reg, offset
+.macro reg_to_vpm_vec16, src_reg, offset
     # set up vpm at row [offset]
     mov r0, vpm_setup(1, 1, h32(offset))
 
-    # add [row_reg] to [offset] and kick off VPM write
-    add vw_setup, r0, row_reg
+    # add [base_row] to [offset] and kick off VPM write
+    add vw_setup, r0, base_row
     mov vpm, src_reg
 .endm
 
-.macro vpm_to_reg_vec16, dst_reg, row_reg, offset
+.macro vpm_to_reg_vec16, dst_reg, offset
     # set up vpm at row [offset]
     mov r0, vpm_setup(1, 1, h32(offset))
 
-    # add [row_reg] to [offset] and kick off VPM read
-    add vr_setup, r0, row_reg
+    # add [base_row] to [offset] and kick off VPM read
+    add vr_setup, r0, base_row
     mov dst_reg, vpm
 .endm
 
-.macro mul_and_accum, row_reg, offset, w2c_reg1, w2c_reg2, w2c_reg3
+.macro mul_and_accum, offset, w2c_reg1, w2c_reg2, w2c_reg3
     # load p.x/y/z into r0
-    vpm_to_reg_vec16 r0, row_reg, offset
+    vpm_to_reg_vec16 r0, offset
 
     mov r1, w2c_reg1
     fmul r1, r1, r0
@@ -136,31 +129,10 @@ mul24 ptr_stride_len, stride, 4
     fadd tz_reg, tz_reg, r1
 .endm
 
-# multiply qpu_num by 3 to get VPM base row
-mov r0, qpu_num
-shl r0, r0, 2
-sub r0, r0, qpu_num
-mov base_row, r0
-
-:loop
-    # load pos_x, pos_y, pos_z into rows qpu_num * 3 + 0/1/2
-    mem_to_vpm_vec16 pos_x, base_row, 0
-    mem_to_vpm_vec16 pos_y, base_row, 1
-    mem_to_vpm_vec16 pos_z, base_row, 2
-
-    # initialize with w2c[3 / 7 / 11]
-    mov tx_reg, w2c3
-    mov ty_reg, w2c7
-    mov tz_reg, w2c11
-    mul_and_accum base_row, 0, w2c0, w2c4, w2c8
-    mul_and_accum base_row, 1, w2c1, w2c5, w2c9
-    mul_and_accum base_row, 2, w2c2, w2c6, w2c10
-    nop
-    nop
-
+.macro calc_uv, offset0, offset1, offset2
     # move depth to VPM (can overrwrite pos)
     mov r2, tz_reg
-    reg_to_vpm_vec16 r2, base_row, 0
+    reg_to_vpm_vec16 r2, offset0
 
     # get r2 reciprocal
     mov sfu_recip, r2
@@ -171,7 +143,7 @@ mov base_row, r0
     fmul r1, r1, tx_reg
     fmul r1, r1, r4
     fadd r3, r3, r1
-    reg_to_vpm_vec16 r3, base_row, 1
+    reg_to_vpm_vec16 r3, offset1
 
     # calculate v: load cy first
     mov r3, cy   # c->cy
@@ -179,12 +151,40 @@ mov base_row, r0
     fmul r1, r1, ty_reg
     fmul r1, r1, r4
     fadd r3, r3, r1
-    reg_to_vpm_vec16 r3, base_row, 2
+    reg_to_vpm_vec16 r3, offset2
+.endm
+
+# loop counter (qpu_num += stride until >= NUM_GAUSSIANS)
+mov loop_counter, qpu_num
+
+# pointer stride length = stride * sizeof(uint32_t)
+shl ptr_stride_len, stride, 2
+
+# multiply qpu_num by 3 to get VPM base row
+mul24 base_row, qpu_num, 3
+
+:loop
+    # load pos_x, pos_y, pos_z into rows qpu_num * 3 + 0/1/2
+    mem_to_vpm_vec16 pos_x, 0
+    mem_to_vpm_vec16 pos_y, 1
+    mem_to_vpm_vec16 pos_z, 2
+
+    # initialize with w2c[3 / 7 / 11]
+    mov tx_reg, w2c3
+    mov ty_reg, w2c7
+    mov tz_reg, w2c11
+    mul_and_accum 0, w2c0, w2c4, w2c8
+    mul_and_accum 1, w2c1, w2c5, w2c9
+    mul_and_accum 2, w2c2, w2c6, w2c10
+    nop
+    nop
+
+    calc_uv 0, 1, 2
 
     # write back to depth, screen_x, screen_y
-    vpm_to_mem_vec16 depth, base_row, 0
-    vpm_to_mem_vec16 screen_x, base_row, 1
-    vpm_to_mem_vec16 screen_y, base_row, 2
+    vpm_to_mem_vec16 depth, 0
+    vpm_to_mem_vec16 screen_x, 1
+    vpm_to_mem_vec16 screen_y, 2
 
     # increment pointers += stride * sizeof(float), check if reached array end
     mov r0, ptr_stride_len

@@ -53,12 +53,15 @@ Mat3 compute_cov3d(Vec3 scale, Vec4 rot) {
     return mat3_mm(M, mat3_t(M));
 }
 
+#include "lib.h"
 Vec3 project_cov2d(Vec3 pos, Mat3 cov3d, Mat4 w2c, float fx, float fy) {
     float tx = w2c.m[0] * pos.x + w2c.m[1] * pos.y + w2c.m[2] * pos.z + w2c.m[3];
     float ty = w2c.m[4] * pos.x + w2c.m[5] * pos.y + w2c.m[6] * pos.z + w2c.m[7];
     float tz = w2c.m[8] * pos.x + w2c.m[9] * pos.y + w2c.m[10] * pos.z + w2c.m[11];
 
-    tz = max(tz, 0.1f);
+    // assert(tz >= 0, "tz is negative");
+    // assert(tz >= 0.01, "tz is small");
+    // tz = max(tz, 0.1f);
     float tz2 = tz * tz;
 
     Mat3 J;
@@ -82,6 +85,7 @@ Vec3 project_cov2d(Vec3 pos, Mat3 cov3d, Mat4 w2c, float fx, float fy) {
 
 Vec3 compute_cov2d_inverse(Vec3 cov2d) {
     float d = max(cov2d.x * cov2d.z - cov2d.y * cov2d.y, 1e-6f);
+    assert(d >= 0, "d is neg");
     Vec3 res = { { cov2d.z / d, -cov2d.y / d, cov2d.x / d } };
     return res;
 }

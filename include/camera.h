@@ -4,6 +4,10 @@
 #include "types.h"
 #include <stdint.h>
 
+// near and far planes for frustum culling
+#define CAMERA_ZNEAR 0.1
+#define CAMERA_ZFAR  100
+
 typedef struct {
     Vec3 pos;
     Vec3 target;

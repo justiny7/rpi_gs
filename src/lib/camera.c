@@ -39,15 +39,19 @@ void project_point(Camera* c, Vec3 p, float* depth, float* u, float* v) {
     float tx = c->w2c.m[0] * p.x + c->w2c.m[1] * p.y + c->w2c.m[2] * p.z + c->w2c.m[3];
     float ty = c->w2c.m[4] * p.x + c->w2c.m[5] * p.y + c->w2c.m[6] * p.z + c->w2c.m[7];
     float tz = c->w2c.m[8] * p.x + c->w2c.m[9] * p.y + c->w2c.m[10] * p.z + c->w2c.m[11];
+    assert(tz != 0, "tz is zero");
+
+    *depth = tz;
     if (tz >= 0 && tz < 0.001) {
-        panic("SMALL POS");
+        // panic("SMALL POS");
+        return;
     } else if (tz <= 0 && tz > -0.001) {
-        panic("SMALL NEG");
+        // panic("SMALL NEG");
+        return;
     }
 
     *u = (c->fx * tx / tz) + c->cx;
     *v = (c->fy * ty / tz) + c->cy;
-    *depth = tz;
 }
 
 Mat3 quat_to_rotmat(Vec4 q) {
