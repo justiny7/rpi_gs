@@ -20,6 +20,7 @@ void kernel_init(Kernel* kernel,
 void kernel_execute(Kernel* kernel);
 void kernel_free(Kernel* kernel);
 
+void kernel_reset_unifs(Kernel* kernel);
 void kernel_load_unif_f(Kernel* kernel, uint32_t qpu, float val);
 void kernel_load_unif_d(Kernel* kernel, uint32_t qpu, uint32_t val);
 #define kernel_load_unif(kernel, qpu, val) _Generic((val), \

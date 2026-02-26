@@ -5,7 +5,7 @@
 #include "camera.h"
 #include <stdint.h>
 
-#define MAX_GAUSSIANS 50000
+#define MAX_GAUSSIANS 96000
 
 // SH coefficients as static const to avoid QEMU .rodata loading issues
 static const float SH_C0 = 0.28209479177387814f;
@@ -54,9 +54,9 @@ typedef struct {
     float rot_y[MAX_GAUSSIANS];
     float rot_z[MAX_GAUSSIANS];
     float rot_w[MAX_GAUSSIANS];
-    float sh_x[MAX_GAUSSIANS][16];
-    float sh_y[MAX_GAUSSIANS][16];
-    float sh_z[MAX_GAUSSIANS][16];
+    float sh_x[16][MAX_GAUSSIANS];
+    float sh_y[16][MAX_GAUSSIANS];
+    float sh_z[16][MAX_GAUSSIANS];
 } GaussianK;
 
 typedef struct {

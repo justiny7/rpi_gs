@@ -39,6 +39,10 @@ void kernel_free(Kernel* kernel) {
     arena_free(&kernel->arena);
 }
 
+void kernel_reset_unifs(Kernel* kernel) {
+    memset(kernel->cur_unif, 0, kernel->num_qpus * sizeof(uint32_t));
+}
+
 void kernel_load_unif_f(Kernel* kernel, uint32_t qpu, float val) {
     assert(qpu < kernel->num_qpus, "Load to invalid QPU");
     assert(kernel->cur_unif[qpu] < kernel->num_unifs, "Loading too many unifs");

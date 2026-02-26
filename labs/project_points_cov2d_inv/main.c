@@ -13,7 +13,7 @@
 #include "project_points_cov2d_inv.h"
 
 #define NUM_QPUS 16
-#define NUM_UNIFS 37
+#define NUM_UNIFS 34
 #define SIMD_WIDTH 16
 #define EPS 0.1
 
@@ -95,9 +95,9 @@ void main() {
     float* depth = arena_alloc_align(&arena, N * sizeof(float), 16);
     float* screen_x = arena_alloc_align(&arena, N * sizeof(float), 16);
     float* screen_y = arena_alloc_align(&arena, N * sizeof(float), 16);
-    float* cov2d_inv_x = arena_alloc_align(&arena, N * sizeof(Vec3), 16);
-    float* cov2d_inv_y = arena_alloc_align(&arena, N * sizeof(Vec3), 16);
-    float* cov2d_inv_z = arena_alloc_align(&arena, N * sizeof(Vec3), 16);
+    float* cov2d_inv_x = arena_alloc_align(&arena, N * sizeof(float), 16);
+    float* cov2d_inv_y = arena_alloc_align(&arena, N * sizeof(float), 16);
+    float* cov2d_inv_z = arena_alloc_align(&arena, N * sizeof(float), 16);
 
     Camera* c = arena_alloc_align(&arena, sizeof(Camera), 16);
     Vec3 cam_pos = { { 0.0f, 0.0f, 0.0f } };

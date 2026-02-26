@@ -15,6 +15,13 @@
         uart_putx((uint32_t) (var)); \
         uart_puts("\n"); \
     } while (0)
+#define DEBUG_F(var) \
+    do { \
+        uart_puts("[DEBUG] " #var ": "); \
+        uart_putf((float) (var)); \
+        uart_puts("\n"); \
+    } while (0)
+
 
 #define DEBUG_DM(var, msg) \
     do { \
@@ -26,6 +33,12 @@
     do { \
         uart_puts("[DEBUG] " #msg ": "); \
         uart_putx((uint32_t) (var)); \
+        uart_puts("\n"); \
+    } while (0)
+#define DEBUG_FM(var, msg) \
+    do { \
+        uart_puts("[DEBUG] " #msg ": "); \
+        uart_putf((float) (var)); \
         uart_puts("\n"); \
     } while (0)
 
