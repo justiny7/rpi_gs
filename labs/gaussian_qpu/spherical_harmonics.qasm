@@ -5,7 +5,6 @@
 .set qpu_num, ra2
 
 .set base_row, ra3          # (qpu_num * 4)
-.set ptr_stride_len, ra4    # (stride * sizeof(float))
 .set loop_counter, ra5
 
 .set pos_x, rb0
@@ -252,8 +251,7 @@
     fadd r2, r2, r1
 
     mov r0, SH_C3_2
-    mov r3, 4.0
-    fmul r1, r3, zz
+    fmul r1, 4.0, zz
     fsub r1, r1, xx
     fsub r1, r1, yy
     fmul r1, r1, y
@@ -284,8 +282,7 @@
     fadd r2, r2, r1
 
     mov r0, SH_C3_4
-    mov r3, 4.0
-    fmul r1, r3, zz
+    fmul r1, 4.0, zz
     fsub r1, r1, xx
     fsub r1, r1, yy
     fmul r1, r1, x
@@ -332,9 +329,6 @@ mov cam_x, unif
 mov cam_y, unif
 mov cam_z, unif
 
-# pointer stride length = stride * sizeof(uint32_t)
-shl ptr_stride_len, stride, 2
-
 # multiply qpu_num by 4 to get VPM base row
 shl base_row, qpu_num, 2
 
@@ -364,8 +358,8 @@ shl base_row, qpu_num, 2
     mov pos_y, pos_y_init
     mov pos_z, pos_z_init
 
-    # loop counter (qpu_num += stride until >= NUM_GAUSSIANS)
-    mov loop_counter, qpu_num
+    # loop counter (qpu_num * SIMD_WIDTH += stride until >= NUM_GAUSSIANS)
+    shl loop_counter, qpu_num, 4
 
     :1
         view_setup
@@ -375,7 +369,7 @@ shl base_row, qpu_num, 2
         # vpm_to_mem_vec16 color, 0
 
         # increment pointers += stride * sizeof(float), check if reached array end
-        mov r0, ptr_stride_len
+        shl r0, stride, 2
         add pos_x, pos_x, r0
         add pos_y, pos_y, r0
         add pos_z, pos_z, r0

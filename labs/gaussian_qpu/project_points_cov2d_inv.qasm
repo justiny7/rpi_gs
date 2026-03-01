@@ -11,9 +11,9 @@
 .set depth, rb3
 .set screen_x, rb4
 .set screen_y, ra5
+.set radius, ra4
 
 .set base_row, ra3          # (qpu_num * 4)
-.set ptr_stride_len, ra4 # (stride * sizeof(float))
 .set loop_counter, rb5
 
 .set tx_reg, ra6
@@ -73,7 +73,7 @@
 .set cov2d_inv_y, ra24
 .set cov2d_inv_z, ra25
 
-# temp_borary scratchpad memory registers
+# temporary scratchpad memory registers
 .set temp_b0, rb24
 .set temp_b1, rb25
 .set temp_b2, rb26
@@ -99,6 +99,7 @@ mov pos_z, unif    # pos_z
 mov depth, unif    # depth
 mov screen_x, unif    # screen_x
 mov screen_y, unif    # screen_y
+mov radius, unif   # radius
 
 mov w2c0, unif
 mov w2c1, unif
@@ -286,10 +287,6 @@ mov cov2d_inv_z, unif
     dot3 temp_a2, J00, J01, J02, temp_b2, temp_b0, temp_b1
     dot3 temp_a5, J10, J11, J12, temp_b2, temp_b0, temp_b1
 
-    # reg_to_vpm_vec16 temp_a3, 0
-    # reg_to_vpm_vec16 temp_a4, 1
-    # reg_to_vpm_vec16 temp_a5, 2
-
     mov temp_b0, temp_a0
     mov temp_b1, temp_a1
     mov temp_b2, temp_a2
@@ -310,6 +307,10 @@ mov cov2d_inv_z, unif
     mov r0, 0.3
     fadd r2, r2, r0
 
+    # calc 0.5 * (cov2d.x + cov2d.y) for radius
+    fadd r0, r2, temp_a0
+    fmul temp_a3, r0, 0.5
+
     # get determinant
     fmul r0, r2, temp_a0
     fmul r1, r3, r3
@@ -321,34 +322,61 @@ mov cov2d_inv_z, unif
 
     mov sfu_recip, r0
 
-    # 2 ops after SFU write
+    # need at least 2 ops after SFU write before reading r4
     mov temp_a2, r2
-    nop
 
-    # reg_to_vpm_vec16 temp_a0, 0
-    # reg_to_vpm_vec16 temp_a1, 3
-    # reg_to_vpm_vec16 temp_a2, 2
+    # while det is still in r0, calc max(0.1f, mid * mid - det)
+    fmul r2, temp_a3, temp_a3
+    fsub r2, r2, r0
+    mov r0, 0.1
+    fmax r2, r2, r0
+
+    # r4 safe to read now... (don't touch r3)
+    mov r3, r4
+
+    # move r2 (max(0.1f, mid * mid - det)) to SFU to get recipsqrt
+    mov sfu_recipsqrt, r2
+
+    # need at least 2 more ops
 
     # cov2d_inv.x
-    fmul r1, temp_a2, r4
+    fmul r1, temp_a2, r3
     reg_to_vpm_vec16 r1, 0
 
+    # move r4 to SFU recip to get actual sqrt
+    mov sfu_recip, r4
+
+    # two more ops...
+
     # cov2d_inv.y
-    fmul r1, temp_a1, r4
+    fmul r1, temp_a1, r3
     mov r2, -1.0
     fmul r1, r1, r2
+
+    # breaking this up to calculate sqrt(max(lambda1, lambda2)) - don't touch r1, r3
+    # now we have sqrt(max(0.1, mid * mid - det)) in r4...
+    fadd r0, temp_a3, r4
+    fsub r2, temp_a3, r4
+    fmax r0, r0, r2
+    mov sfu_recipsqrt, r0
+
     reg_to_vpm_vec16 r1, 1
 
+    # move r4 to SFU recip to get actual sqrt
+    mov sfu_recip, r4
+
     # cov2d_inv.z
-    fmul r1, temp_a0, r4
+    fmul r1, temp_a0, r3
     reg_to_vpm_vec16 r1, 2
+
+    # now we can finally get radius
+    mov r1, 3.5
+    fmul r1, r1, r4
+    reg_to_vpm_vec16 r1, 3
 .endm
 
-# loop counter (qpu_num += stride until >= NUM_GAUSSIANS)
-mov loop_counter, qpu_num
-
-# pointer stride length = stride * sizeof(uint32_t)
-shl ptr_stride_len, stride, 2
+# loop counter (qpu_num * SIMD_WIDTH += stride until >= NUM_GAUSSIANS)
+shl loop_counter, qpu_num, 4
 
 # multiply qpu_num by 4 to get VPM base row
 shl base_row, qpu_num, 2
@@ -383,16 +411,17 @@ shl base_row, qpu_num, 2
     vpm_to_mem_vec16 cov2d_inv_x, 0
     vpm_to_mem_vec16 cov2d_inv_y, 1
     vpm_to_mem_vec16 cov2d_inv_z, 2
-    # vpm_to_mem_vec16 screen_y, 3
+    vpm_to_mem_vec16 radius, 3
 
     # increment pointers += stride * sizeof(float), check if reached array end
-    mov r0, ptr_stride_len
+    shl r0, stride, 2
     add pos_x, pos_x, r0
     add pos_y, pos_y, r0
     add pos_z, pos_z, r0
     add depth, depth, r0
     add screen_x, screen_x, r0
     add screen_y, screen_y, r0
+    add radius, radius, r0
     add cov3da, cov3da, r0
     add cov3db, cov3db, r0
     add cov3dc, cov3dc, r0

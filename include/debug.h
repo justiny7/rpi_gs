@@ -25,19 +25,25 @@
 
 #define DEBUG_DM(var, msg) \
     do { \
-        uart_puts("[DEBUG] " #msg ": "); \
+        uart_puts("[DEBUG] "); \
+        uart_puts(msg); \
+        uart_puts(": "); \
         uart_putd((uint32_t) (var)); \
         uart_puts("\n"); \
     } while (0)
 #define DEBUG_XM(var, msg) \
     do { \
-        uart_puts("[DEBUG] " #msg ": "); \
+        uart_puts("[DEBUG] "); \
+        uart_puts(msg); \
+        uart_puts(": "); \
         uart_putx((uint32_t) (var)); \
         uart_puts("\n"); \
     } while (0)
 #define DEBUG_FM(var, msg) \
     do { \
-        uart_puts("[DEBUG] " #msg ": "); \
+        uart_puts("[DEBUG] "); \
+        uart_puts(msg); \
+        uart_puts(": "); \
         uart_putf((float) (var)); \
         uart_puts("\n"); \
     } while (0)

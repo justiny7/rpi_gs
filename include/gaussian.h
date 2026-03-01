@@ -3,6 +3,7 @@
 
 #include "types.h"
 #include "camera.h"
+#include "arena_allocator.h"
 #include <stdint.h>
 
 #define MAX_GAUSSIANS 96000
@@ -60,11 +61,25 @@ typedef struct {
 } GaussianK;
 
 typedef struct {
+    float* pos_x;
+    float* pos_y;
+    float* pos_z;
+    float* cov3d[6];
+    float* sh_x[16];
+    float* sh_y[16];
+    float* sh_z[16];
+
+    uint32_t size;
+} GaussianPtr;
+
+typedef struct {
     float screen_x, screen_y;
     float depth;
     Vec3 cov2d_inv;
     Vec3 color;
     float opacity;
+    float radius;
+    uint32_t tile;
 } ProjectedGaussian;
 
 typedef struct {
@@ -74,6 +89,8 @@ typedef struct {
     Vec3 cov2d_inv[MAX_GAUSSIANS];
     Vec3 color[MAX_GAUSSIANS];
     float opacity[MAX_GAUSSIANS];
+    float radius[MAX_GAUSSIANS];
+    uint32_t tile[MAX_GAUSSIANS];
 } ProjectedGaussianSoA;
 
 typedef struct {
@@ -87,7 +104,29 @@ typedef struct {
     float color_g[MAX_GAUSSIANS];
     float color_b[MAX_GAUSSIANS];
     float opacity[MAX_GAUSSIANS];
+    union { float radius; uint32_t id; } radius_id[MAX_GAUSSIANS];
+    uint32_t tile[MAX_GAUSSIANS];
 } ProjectedGaussianK;
+
+typedef struct {
+    float* screen_x;
+    float* screen_y;
+    float* depth;
+    float* cov2d_inv_x;
+    float* cov2d_inv_y;
+    float* cov2d_inv_z;
+    float* color_r;
+    float* color_g;
+    float* color_b;
+    float* opacity;
+    union { float radius; uint32_t id; }* radius_id;
+    uint32_t* tile;
+
+    uint32_t size;
+} ProjectedGaussianPtr;
+
+void init_gaussian_ptr(GaussianPtr *p, Arena* a, uint32_t size);
+void init_projected_gaussian_ptr(ProjectedGaussianPtr *p, Arena* a, uint32_t size);
 
 Vec3 eval_sh(Vec3 pos, Vec3* sh, Vec3 cam_pos);
 Mat3 compute_cov3d(Vec3 scale, Vec4 rot);

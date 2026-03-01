@@ -12,12 +12,14 @@
 
 #include "project_points_cov2d_inv.h"
 
-#define NUM_QPUS 16
-#define NUM_UNIFS 34
+#define NUM_QPUS 12
+// #define NUM_QPUS 1
+#define NUM_UNIFS 35
 #define SIMD_WIDTH 16
 #define EPS 0.1
 
-#define N NUM_QPUS * SIMD_WIDTH * 200
+#define N NUM_QPUS * SIMD_WIDTH * 300
+// #define N NUM_QPUS * SIMD_WIDTH * 2
 
 // #define VERBOSE
 
@@ -80,7 +82,7 @@ void main() {
     const int MiB = 1024 * 1024;
 
     Arena arena;
-    arena_init(&arena, 25 * MiB);
+    arena_init(&arena, 30 * MiB);
 
     // input
     float* pos_x = arena_alloc_align(&arena, N * sizeof(float), 16);
@@ -93,6 +95,7 @@ void main() {
 
     // output
     float* depth = arena_alloc_align(&arena, N * sizeof(float), 16);
+    float* radius = arena_alloc_align(&arena, N * sizeof(float), 16);
     float* screen_x = arena_alloc_align(&arena, N * sizeof(float), 16);
     float* screen_y = arena_alloc_align(&arena, N * sizeof(float), 16);
     float* cov2d_inv_x = arena_alloc_align(&arena, N * sizeof(float), 16);
@@ -104,22 +107,29 @@ void main() {
     Vec3 cam_target = { { 0.0f, 0.0f, 5.0f } };
     Vec3 cam_up = { { 0.0f, 1.0f, 0.0f } };
 
-    init_camera(c, cam_pos, cam_target, cam_up, 800, 600);
+    init_camera(c, cam_pos, cam_target, cam_up, 640, 480);
 
     for (uint32_t i = 0; i < N; i++) {
         pos_x[i] = rand_f() * 100;
         pos_y[i] = rand_f() * 100;
         pos_z[i] = rand_f() * 100;
 
-        cov3d[0][i] = rand_f();
-        cov3d[1][i] = rand_f();
-        cov3d[2][i] = rand_f();
-        cov3d[3][i] = cov3d[1][i];
-        cov3d[4][i] = rand_f();
-        cov3d[5][i] = rand_f();
-        cov3d[6][i] = cov3d[2][i];
-        cov3d[7][i] = cov3d[5][i];
-        cov3d[8][i] = rand_f();
+        Vec3 scale;
+        scale.x = rand_f() * 2;
+        scale.y = rand_f() * 2;
+        scale.z = rand_f() * 2;
+
+        Vec4 rot;
+        rot.x = rand_f();
+        rot.y = rand_f();
+        rot.z = rand_f();
+        rot.w = rand_f();
+        vec4_sdiv(rot, vec4_len(rot));
+
+        Mat3 cov3d_m = compute_cov3d(scale, rot);
+        for (int j = 0; j < 9; j++) {
+            cov3d[j][i] = cov3d_m.m[j];
+        }
 
 #ifdef VERBOSE
         uart_putf(pos_x[i]);
@@ -170,6 +180,7 @@ void main() {
         kernel_load_unif(&project_points_cov2d_inv_k, q, TO_BUS(depth + q * SIMD_WIDTH));
         kernel_load_unif(&project_points_cov2d_inv_k, q, TO_BUS(screen_x + q * SIMD_WIDTH));
         kernel_load_unif(&project_points_cov2d_inv_k, q, TO_BUS(screen_y + q * SIMD_WIDTH));
+        kernel_load_unif(&project_points_cov2d_inv_k, q, TO_BUS(radius + q * SIMD_WIDTH));
 
         for (uint32_t i = 0; i < 12; i++) {
             kernel_load_unif(&project_points_cov2d_inv_k, q, c->w2c.m[i]);
@@ -200,26 +211,22 @@ void main() {
 
 #ifdef VERBOSE
     for (uint32_t i = 0; i < N; i++) {
-        uart_putd(i);
-        uart_puts("\ndepth: ");
-        uart_putf(depth[i]);
-        uart_puts("\nscreen_x: ");
-        uart_putf(screen_x[i]);
-        uart_puts("\nscreen_y: ");
-        uart_putf(screen_y[i]);
-        uart_puts("\ncov2d_inv_x: ");
-        uart_putf(cov2d_inv_x[i]);
-        uart_puts("\ncov2d_inv_y: ");
-        uart_putf(cov2d_inv_y[i]);
-        uart_puts("\ncov2d_inv_z: ");
-        uart_putf(cov2d_inv_z[i]);
-        uart_puts("\n\n");
+        DEBUG_DM(i, "Iteration");
+        DEBUG_F(depth[i]);
+        DEBUG_F(screen_x[i]);
+        DEBUG_F(screen_y[i]);
+        DEBUG_F(cov2d_inv_x[i]);
+        DEBUG_F(cov2d_inv_y[i]);
+        DEBUG_F(cov2d_inv_z[i]);
+        DEBUG_F(radius[i]);
+        uart_puts("\n");
     }
 #endif
 
     float depth_res[N];
     float screen_x_res[N];
     float screen_y_res[N];
+    float radius_res[N];
     Vec3 cov2d_inv_res[N];
 
     t = sys_timer_get_usec();
@@ -242,11 +249,46 @@ void main() {
         cov2d.z += 0.3f;
 
         cov2d_inv_res[i] = compute_cov2d_inverse(cov2d);
+
+        float mid = 0.5f * (cov2d.x + cov2d.z);
+        float det = max(cov2d.x * cov2d.z - cov2d.y * cov2d.y, 1e-6f);
+        float lambda1 = mid + sqrtf(max(0.1f, mid * mid - det));
+        float lambda2 = mid - sqrtf(max(0.1f, mid * mid - det));
+        float r = 3.5f * sqrtf(max(lambda1, lambda2));
+
+        /*
+        DEBUG_DM(i, "iteration");
+        DEBUG_F(screen_x_res[i]);
+        DEBUG_F(screen_y_res[i]);
+        DEBUG_F(depth_res[i]);
+        DEBUG_F(mid);
+        DEBUG_F(det);
+        DEBUG_F(lambda1);
+        DEBUG_F(lambda2);
+        DEBUG_F(radius[i]);
+        DEBUG_F(r);
+        uart_puts("\n");
+        */
+
+        radius_res[i] = r;
+
+        /*
+        int r_int = (int) r;
+        if (r > r_int) {
+            radius_res[i] = r + 1;
+        } else {
+            radius_res[i] = r;
+        }
+        */
     }
+
     uint32_t cpu_time = sys_timer_get_usec() - t;
     DEBUG_D(cpu_time);
 
-    uint32_t depth_screen_mismatch = 0, cov2d_mismatch = 0;
+    float speedup = 1.0 * cpu_time / qpu_time;
+    DEBUG_F(speedup);
+
+    uint32_t depth_screen_mismatch = 0, cov2d_mismatch = 0, rad_mismatch = 0;
     for (uint32_t i = 0; i < N; i++) {
         // don't care about Gaussians not in frustum, though QPU will still calculate
         if (depth_res[i] < CAMERA_ZNEAR || depth_res[i] > CAMERA_ZFAR) {
@@ -259,36 +301,23 @@ void main() {
 #ifdef VERBOSE
             uart_puts("SCREEN OR DEPTH MISMATCH: ");
             uart_putd(i);
-            uart_puts("\nQPU: ");
-            uart_puts("\ndepth: ");
-            uart_putf(depth[i]);
-            uart_puts("\nscreen_x: ");
-            uart_putf(screen_x[i]);
-            uart_puts("\nscreen_y: ");
-            uart_putf(screen_y[i]);
-            uart_puts("\ncov2d_inv_x: ");
-            uart_putf(cov2d_inv_x[i]);
-            uart_puts("\ncov2d_inv_y: ");
-            uart_putf(cov2d_inv_y[i]);
-            uart_puts("\ncov2d_inv_z: ");
-            uart_putf(cov2d_inv_z[i]);
-            uart_puts("\n\n");
+            uart_puts("\nQPU:\n");
+            DEBUG_F(depth[i]);
+            DEBUG_F(screen_x[i]);
+            DEBUG_F(screen_y[i]);
+            DEBUG_F(cov2d_inv_x[i]);
+            DEBUG_F(cov2d_inv_y[i]);
+            DEBUG_F(cov2d_inv_z[i]);
 
-            uart_puts("\nCPU: ");
-            uart_puts("\ndepth: ");
-            uart_putf(depth_res[i]);
-            uart_puts("\nscreen_x: ");
-            uart_putf(screen_x_res[i]);
-            uart_puts("\nscreen_y: ");
-            uart_putf(screen_y_res[i]);
-            uart_puts("\ncov2d_inv_x: ");
-            uart_putf(cov2d_inv_res[i].x);
-            uart_puts("\ncov2d_inv_y: ");
-            uart_putf(cov2d_inv_res[i].y);
-            uart_puts("\ncov2d_inv_z: ");
-            uart_putf(cov2d_inv_res[i].z);
+            uart_puts("\nCPU:\n");
+            DEBUG_F(depth_res[i]);
+            DEBUG_F(screen_x_res[i]);
+            DEBUG_F(screen_y_res[i]);
+            DEBUG_F(cov2d_inv_res[i].x);
+            DEBUG_F(cov2d_inv_res[i].y);
+            DEBUG_F(cov2d_inv_res[i].z);
 
-            uart_puts("\n\n");
+            uart_puts("\n");
 #endif
 
             depth_screen_mismatch++;
@@ -296,37 +325,26 @@ void main() {
         if (!mul_eps(cov2d_inv_res[i].x, cov2d_inv_x[i], EPS) ||
                 !mul_eps(cov2d_inv_res[i].y, cov2d_inv_y[i], EPS) ||
                 !mul_eps(cov2d_inv_res[i].z, cov2d_inv_z[i], EPS)) {
-#ifdef VERBOSE
+// #ifdef VERBOSE
             uart_puts("COV2D MISMATCH: ");
             uart_putd(i);
-            uart_puts("\nQPU: ");
-            uart_puts("\ndepth: ");
-            uart_putf(depth[i]);
-            uart_puts("\nscreen_x: ");
-            uart_putf(screen_x[i]);
-            uart_puts("\nscreen_y: ");
-            uart_putf(screen_y[i]);
-            uart_puts("\ncov2d_inv_x: ");
-            uart_putf(cov2d_inv_x[i]);
-            uart_puts("\ncov2d_inv_y: ");
-            uart_putf(cov2d_inv_y[i]);
-            uart_puts("\ncov2d_inv_z: ");
-            uart_putf(cov2d_inv_z[i]);
-            uart_puts("\n");
+            uart_puts("\nQPU:\n");
+            DEBUG_F(depth[i]);
+            DEBUG_F(screen_x[i]);
+            DEBUG_F(screen_y[i]);
+            DEBUG_F(cov2d_inv_x[i]);
+            DEBUG_F(cov2d_inv_y[i]);
+            DEBUG_F(cov2d_inv_z[i]);
 
-            uart_puts("\nCPU: ");
-            uart_puts("\ndepth: ");
-            uart_putf(depth_res[i]);
-            uart_puts("\nscreen_x: ");
-            uart_putf(screen_x_res[i]);
-            uart_puts("\nscreen_y: ");
-            uart_putf(screen_y_res[i]);
-            uart_puts("\ncov2d_inv_x: ");
-            uart_putf(cov2d_inv_res[i].x);
-            uart_puts("\ncov2d_inv_y: ");
-            uart_putf(cov2d_inv_res[i].y);
-            uart_puts("\ncov2d_inv_z: ");
-            uart_putf(cov2d_inv_res[i].z);
+            uart_puts("\nCPU:\n");
+            DEBUG_F(depth_res[i]);
+            DEBUG_F(screen_x_res[i]);
+            DEBUG_F(screen_y_res[i]);
+            DEBUG_F(cov2d_inv_res[i].x);
+            DEBUG_F(cov2d_inv_res[i].y);
+            DEBUG_F(cov2d_inv_res[i].z);
+
+            uart_puts("\n");
 
             {
                 Vec3 p = { { pos_x[i], pos_y[i], pos_z[i] } };
@@ -346,30 +364,38 @@ void main() {
                 cov2d.x += 0.3f;
                 cov2d.z += 0.3f;
 
-                uart_puts("\n");
-                uart_puts("cov2d.x: ");
-                uart_putf(cov2d.x);
-                uart_puts("\n");
-                uart_puts("cov2d.y: ");
-                uart_putf(cov2d.y);
-                uart_puts("\n");
-                uart_puts("cov2d.z: ");
-                uart_putf(cov2d.z);
-                uart_puts("\n");
+                DEBUG_F(cov2d.x);
+                DEBUG_F(cov2d.y);
+                DEBUG_F(cov2d.z);
 
                 cov2d_inv_res[i] = compute_cov2d_inverse(cov2d);
             }
 
             uart_puts("\n\n");
-#endif
 
             cov2d_mismatch++;
         }
+        if (!mul_eps(radius_res[i], radius[i], EPS)) {
+            uart_puts("RAD MISMATCH: ");
+            uart_putd(i);
+
+            uart_puts("\nQPU:\n");
+            DEBUG_F(radius[i]);
+
+            uart_puts("\nCPU:\n");
+            DEBUG_F(radius_res[i]);
+
+            rad_mismatch++;
+
+        }
+// #endif
+
     }
 
     // mismatches in cov2D_inv usually bc cov2D has minor fp error that's blown up by inverse
     DEBUG_D(depth_screen_mismatch);
     DEBUG_D(cov2d_mismatch);
+    DEBUG_D(rad_mismatch);
 
     rpi_reset();
 }
