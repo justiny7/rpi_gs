@@ -12,13 +12,13 @@
 
 #include "spherical_harmonics.h"
 
-#define NUM_QPUS 16
+#define NUM_QPUS 12
 #define NUM_UNIFS 60
 #define SIMD_WIDTH 16
 #define EPS 0.1
 
-// #define N (NUM_QPUS * SIMD_WIDTH * 500)
-#define N 96000
+#define N (NUM_QPUS * SIMD_WIDTH * 300)
+// #define N 96000
 
 #define abs(x, y) (((x - y) > 0) ? (x - y) : (y - x))
 

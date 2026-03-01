@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-extern uint32_t project_points_cov2d_inv[650];
+extern uint32_t project_points_cov2d_inv[698];
 
 
 #ifdef __cplusplus

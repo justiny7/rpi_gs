@@ -1,21 +1,20 @@
 #include "mailbox_interface.h"
 #include "uart.h"
 #include "lib.h"
+#include "debug.h"
 
-#define HEIGHT 640
-#define WIDTH 640
+#define HEIGHT 1200
+#define WIDTH 1200
 #define K 8
 
 void main() {
     uint32_t *fb;
     uint32_t size, width, height, pitch;
 
-    mbox_framebuffer_set_physical_width_height(WIDTH, HEIGHT);
-    mbox_framebuffer_set_virtual_width_height(WIDTH, HEIGHT);
-    mbox_framebuffer_set_pixel_order(PIXEL_ORDER_BGR); // default RGB is little endian on QEMU (so hex is reversed)
-    mbox_framebuffer_set_depth(32);
-
-    mbox_allocate_framebuffer(16, &fb, &size);
+    mbox_framebuffer_init(WIDTH, HEIGHT, 32, &fb, &size, &pitch);
+    DEBUG_D(mbox_framebuffer_get_pixel_order());
+    DEBUG_D(mbox_framebuffer_get_alpha_mode());
+    
 
     pitch = mbox_framebuffer_get_pitch();
     mbox_framebuffer_get_physical_width_height(&width, &height);
@@ -34,9 +33,9 @@ void main() {
         for (uint32_t j = 0; j < width; j++) {
             int idx = i * width + j;
             if ((i * K / WIDTH + j * K / WIDTH) & 1) {
-                pixel_ptr[idx] = 0x00BD4BE3; // QEMU ignored alpha channels, even when you turn on
+                pixel_ptr[idx] = 0xFFBD4BE3; // QEMU ignored alpha channels, even when you turn on
             } else {
-                pixel_ptr[idx] = 0x00FFFFFF;
+                pixel_ptr[idx] = 0xFFFFFFFF;
             }
 
             if (i + j % 100 == 0) {

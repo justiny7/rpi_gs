@@ -1,5 +1,49 @@
 #include "gaussian.h"
 #include "math.h"
+#include "lib.h"
+
+void init_gaussian_ptr(GaussianPtr *p, Arena* a, uint32_t size) {
+    // align to 16 floats bc size isn't necessarily divisible by 16
+    uint32_t align = 16 * sizeof(float);
+    p->pos_x = arena_alloc_align(a, size * sizeof(float), align);
+    p->pos_y = arena_alloc_align(a, size * sizeof(float), align);
+    p->pos_z = arena_alloc_align(a, size * sizeof(float), align);
+
+    for (int i = 0; i < 6; i++) {
+        p->cov3d[i] = arena_alloc_align(a, size * sizeof(float), align);
+    }
+    for (int i = 0; i < 16; i++) {
+        p->sh_x[i] = arena_alloc_align(a, size * sizeof(float), align);
+        p->sh_y[i] = arena_alloc_align(a, size * sizeof(float), align);
+        p->sh_z[i] = arena_alloc_align(a, size * sizeof(float), align);
+    }
+
+    p->size = size;
+}
+void init_projected_gaussian_ptr(ProjectedGaussianPtr *p, Arena* a, uint32_t size) {
+    // align to 16 floats bc size isn't necessarily divisible by 16
+    uint32_t align = 16 * sizeof(float);
+    p->screen_x = arena_alloc_align(a, size * sizeof(float), align);
+    p->screen_y = arena_alloc_align(a, size * sizeof(float), align);
+    p->depth = arena_alloc_align(a, size * sizeof(float), align);
+    p->cov2d_inv_x = arena_alloc_align(a, size * sizeof(float), align);
+    p->cov2d_inv_y = arena_alloc_align(a, size * sizeof(float), align);
+    p->cov2d_inv_z = arena_alloc_align(a, size * sizeof(float), align);
+    p->color_r = arena_alloc_align(a, size * sizeof(float), align);
+    p->color_g = arena_alloc_align(a, size * sizeof(float), align);
+    p->color_b = arena_alloc_align(a, size * sizeof(float), align);
+    p->opacity = arena_alloc_align(a, size * sizeof(float), align);
+    p->radius_id = arena_alloc_align(a, size * sizeof(float), align);
+    p->tile = arena_alloc_align(a, size * sizeof(uint32_t), align);
+
+    typedef union {
+        float r;
+        uint32_t i;
+    } tt;
+    assert(sizeof(tt) == sizeof(float), "ajsdklf");
+
+    p->size = size;
+}
 
 Vec3 eval_sh(Vec3 pos, Vec3* sh, Vec3 cam_pos) {
     Vec3 dir = vec3_sub(pos, cam_pos);
@@ -53,7 +97,6 @@ Mat3 compute_cov3d(Vec3 scale, Vec4 rot) {
     return mat3_mm(M, mat3_t(M));
 }
 
-#include "lib.h"
 Vec3 project_cov2d(Vec3 pos, Mat3 cov3d, Mat4 w2c, float fx, float fy) {
     float tx = w2c.m[0] * pos.x + w2c.m[1] * pos.y + w2c.m[2] * pos.z + w2c.m[3];
     float ty = w2c.m[4] * pos.x + w2c.m[5] * pos.y + w2c.m[6] * pos.z + w2c.m[7];
@@ -110,6 +153,21 @@ void precompute_gaussians(Camera* c, Gaussian* g, ProjectedGaussian* pg, uint32_
         pg[i].cov2d_inv = compute_cov2d_inverse(cov2d);
         pg[i].color = eval_sh(g[i].pos, g[i].sh, c->pos);
         pg[i].opacity = g[i].opacity;
+
+        float mid = 0.5f * (cov2d.x + cov2d.y);
+        float det = max(cov2d.x * cov2d.z - cov2d.y * cov2d.y, 1e-6f);
+        float lambda1 = mid + sqrtf(max(0.1f, mid * mid - det));
+        float lambda2 = mid - sqrtf(max(0.1f, mid * mid - det));
+        float r = 3.5f * sqrtf(max(lambda1, lambda2));
+
+        int r_int = (int) r;
+        if (r > r_int) {
+            pg[i].radius = r + 1;
+        } else {
+            pg[i].radius = r;
+        }
+
+        // pg[i].radius = 3.0f * sqrtf(max(lambda1, lambda2));
     }
 }
 
