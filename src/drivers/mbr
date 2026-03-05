@@ -1,4 +1,4 @@
-#include "rpi.h"
+#include "uart.h"
 #include "pi-sd.h"
 #include "mbr.h"
 

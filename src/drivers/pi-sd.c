@@ -1,4 +1,4 @@
-#include "rpi.h"
+#include "uart.h"
 #include "pi-sd.h"
 #include "libc/fast-hash32.h"
 
@@ -32,20 +32,24 @@ int pi_sd_init(void) {
 }
 
 int pi_sd_read(void *data, uint32_t lba, uint32_t nsec) {
-  demand(init_p, "SD card not initialized!\n");
+  assert(init_p, "SD card not initialized!\n");
   int res;
   if((res = sd_readblock(lba, data, nsec)) != 512 * nsec)
     panic("could not read from sd card: result = %d\n", res);
 
   if(trace_p)
-    trace("sd_read: lba=<%x>, cksum=%x\n", lba, fast_hash(data,nsec*512));
+    uart_puts("sd_read: lba=<");
+    uart_putx(lba);
+    uart_puts(">, cksum=");
+    uart_putx(fast_hash(data,nsec*512));
+    uart_puts("\n");
   return 1;
 }
 
 // allocate <nsec> worth of space, read in from SD card, return pointer.
 // your kmalloc better work!
 void *pi_sec_read(uint32_t lba, uint32_t nsec) {
-  demand(init_p, "SD card not initialized!\n");
+  assert(init_p, "SD card not initialized!\n");
    // output("about to allocate %d\n", nsec * 512);
   uint8_t *data = kmalloc(nsec * 512);
   if(!pi_sd_read(data, lba, nsec))
@@ -56,12 +60,16 @@ void *pi_sec_read(uint32_t lba, uint32_t nsec) {
 #endif
 
 int pi_sd_write(void *data, uint32_t lba, uint32_t nsec) {
-  demand(init_p, "SD card not initialized!\n");
+  assert(init_p, "SD card not initialized!\n");
   int res;
   if((res = sd_writeblock(data, lba, nsec)) != 512 * nsec)
     panic("could not write to sd card: result = %d\n", res);
 
   if(trace_p)
-    trace("sd_write: lba=<%x>, cksum=%x\n", lba, our_crc32(data,nsec*512));
+    uart_puts("sd_write: lba=<");
+    uart_putx(lba);
+    uart_puts(">, cksum=");
+    uart_putx(our_crc32(data,nsec*512));
+    uart_puts("\n");
   return 1;
 }

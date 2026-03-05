@@ -1,9 +1,11 @@
 /****************************************************************************************
  * engler, cs140e: long file name helpers.  based on wikipedia's writeup.
  */
-#include "rpi.h"
 #include "fat32.h"
 #include "fat32-helpers.h"
+#include "uart.h"
+#include "lib.h"
+#include "string.h"
 
 int is_attr(uint32_t x, uint32_t flag) {
     if(x == FAT32_LONG_FILE_NAME)
@@ -30,15 +32,22 @@ int lfn_is_deleted(uint8_t seqno) {
     return (seqno & 0xe5) == 0xe5;
 }
 int fat32_dirent_is_deleted_lfn(fat32_dirent_t *d) {
-    assert(d->attr == FAT32_LONG_FILE_NAME);
+    assert(d->attr == FAT32_LONG_FILE_NAME, "");
     lfn_dir_t *l = (void*)d;
     return lfn_is_deleted(l->seqno);
 }
 
 void lfn_print_ent(lfn_dir_t *l, uint8_t cksum) {
     uint8_t n = l->seqno;
-    printk("\tseqno = %x, first=%d, last=%d, deleted=%d\n", 
-            n, lfn_is_first(n), lfn_is_last(n), lfn_is_deleted(n));
+    uart_puts("\tseqno = ");
+    uart_putx(n);
+    uart_puts(", first=");
+    uart_putd(lfn_is_first(n));
+    uart_puts(", last=");
+    uart_putd(lfn_is_last(n));
+    uart_puts(", deleted=");
+    uart_putd(lfn_is_deleted(n));
+    uart_puts("\n");
  
     uint8_t buf[27];
     memcpy(&buf[0],  l->name1_5,  10);
@@ -49,9 +58,19 @@ void lfn_print_ent(lfn_dir_t *l, uint8_t cksum) {
     for(int i = 0; i < 26; i += 2) {
         if(buf[i] == 0 && buf[i+1] == 0)
             break;
-        printk("lfn[%d] = '%c' = %x\n", i, buf[i], buf[i]);
+        uart_puts("lfn[");
+        uart_putd(i);
+        uart_puts("] = '");
+        uart_putc(buf[i]);
+        uart_puts("' = ");
+        uart_putx(buf[i]);
+        uart_puts("\n");
     }
-    printk("\tcksum=%x (expected=%x)\n", l->cksum, cksum);
+    uart_puts("\tcksum=");
+    uart_putx(l->cksum);
+    uart_puts(" (expected=");
+    uart_putx(cksum);
+    uart_puts(")\n");
 }
 
 #include "unicode-utf8.h"
@@ -65,8 +84,8 @@ static inline int lfn_terminator(uint8_t *x) {
 }
 
 static char *utf8_append(char *buf, uint8_t *unicode, unsigned nbytes) {
-    assert(nbytes%2 == 0);
-    for(int i = 0; i < nbytes; i+=2) {
+    assert(nbytes%2 == 0, "");
+    for(int i = 0; i < (int) nbytes; i+=2) {
         if(lfn_terminator(unicode+i))
             break;
         char *utf8 = to_utf8(unicode[i] | (unicode[i+1]<<8));
@@ -82,7 +101,7 @@ char *lfn_get_name(lfn_dir_t *s, int cnt) {
     char *buf = filename;
     for(int i = cnt-1; i >= 0; i--) {
         lfn_dir_t *l = s+i;
-        assert(l->attr == FAT32_LONG_FILE_NAME);
+        assert(l->attr == FAT32_LONG_FILE_NAME, "");
         buf = utf8_append(buf, l->name1_5, sizeof l->name1_5);
         buf = utf8_append(buf, l->name6_11, sizeof l->name6_11);
         buf = utf8_append(buf, l->name12_13, sizeof l->name12_13);
@@ -92,25 +111,27 @@ char *lfn_get_name(lfn_dir_t *s, int cnt) {
 }
 
 void lfn_print(lfn_dir_t *s, int cnt, uint8_t cksum, int print_ent_p) {
-    assert(cnt >= 1);
+    assert(cnt >= 1, "");
 
     // weird if larger.
-    demand(cnt > 0 && cnt < 3, weird for cs140e if larger!);
+    assert(cnt > 0 && cnt < 3, "weird for cs140e if larger!");
     for(int i = 0;  i < cnt; i++) {
-        assert(!lfn_is_deleted((s+i)->seqno)); 
+        assert(!lfn_is_deleted((s+i)->seqno), ""); 
         if(print_ent_p) {
-            printk("lfn[%d]=\n", i);
+            uart_puts("lfn[");
+            uart_putd(i);
+            uart_puts("]=\n");
             lfn_print_ent(s+i, cksum);
         }
-        assert(s[i].cksum == cksum);
+        assert(s[i].cksum == cksum, "");
     }
-    assert(lfn_is_last(s->seqno));
-    assert(lfn_is_first((s+cnt-1)->seqno));
+    assert(lfn_is_last(s->seqno), "");
+    assert(lfn_is_first((s+cnt-1)->seqno), "");
 }
 
 // reconstruct file name, return pointer to the dir-entry.
 fat32_dirent_t *fat32_dir_filename(char *name, fat32_dirent_t *d, fat32_dirent_t *end) {
-    assert(!fat32_dirent_free(d));
+    assert(!fat32_dirent_free(d), "");
 
     uint32_t x = d->attr;
 
@@ -119,14 +140,14 @@ fat32_dirent_t *fat32_dir_filename(char *name, fat32_dirent_t *d, fat32_dirent_t
         for(; cnt < n; cnt++)
             if(d[cnt].attr != FAT32_LONG_FILE_NAME)
                 break;
-        assert(cnt < n);
-        assert(is_attr(d[cnt].attr, FAT32_DIR) || is_attr(d[cnt].attr, FAT32_ARCHIVE));
+        assert(cnt < n, "");
+        assert(is_attr(d[cnt].attr, FAT32_DIR) || is_attr(d[cnt].attr, FAT32_ARCHIVE), "");
         strcpy(name, lfn_get_name((void*)d, cnt));
         return d+cnt;
     } else {
         assert(is_attr(x, FAT32_DIR) 
             || is_attr(x, FAT32_ARCHIVE) 
-            || is_attr(x, FAT32_VOLUME_LABEL));
+            || is_attr(x, FAT32_VOLUME_LABEL), "");
         int i=0,j=0, lower_case_p = 0;
 
         // macos?
@@ -162,20 +183,23 @@ int fat32_lfn_print(const char *msg, fat32_dirent_t *d, int left) {
         fat32_dirent_print(msg, d);
         return 1;
     }
-    printk("%s: ", msg);
+    uart_puts(msg);
+    uart_puts(": ");
 
     int cnt;
     for(cnt = 0; cnt < left; cnt++)
         if(d[cnt].attr != FAT32_LONG_FILE_NAME)
                 break;
 
-    assert(cnt < left);
-    assert(is_attr(d[cnt].attr, FAT32_DIR) || is_attr(d[cnt].attr, FAT32_ARCHIVE));
-    printk("\n");
+    assert(cnt < left, "");
+    assert(is_attr(d[cnt].attr, FAT32_DIR) || is_attr(d[cnt].attr, FAT32_ARCHIVE), "");
+    uart_puts("\n");
     lfn_print((void*)d, cnt, lfn_checksum(d[cnt].filename),0);
 
     char *name = lfn_get_name((void*)d, cnt);
-    printk("\treconstructed filename = <%s>\n\t", name);
+    uart_puts("\treconstructed filename = <");
+    uart_puts(name);
+    uart_puts(">\n\t");
 
     d = &d[cnt];
     cnt++;

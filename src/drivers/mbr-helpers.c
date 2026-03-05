@@ -2,7 +2,7 @@
  * engler, cs140e: helpers for master boot record.  
  * do not modify this file!   will be pushing changes.
  */
-#include "rpi.h"
+#include "uart.h"
 #include "mbr.h"
 
 void mbr_check(struct mbr *mbr) { 
@@ -87,12 +87,20 @@ int mbr_partition_empty_raw(uint8_t *part) {
 }
 
 void mbr_partition_print(const char *msg, struct partition_entry *p) {
-    printk("%s:\n", msg);
-    printk("\tbootable  = %s\n", p->bootable_p ? "true" : "false");
-    printk("\tchs_start = %x\n", p->chs_start);
-    printk("\tpart type = %x (%s)\n", p->part_type, mbr_part_str(p->part_type));
-    printk("\tchs_end   = %x\n", p->chs_end);
-    printk("\tlba_start = %x\n", p->lba_start);
-    printk("\tnsector   = %d (%dGB)\n", p->nsec, p->nsec / (2*1024*1024));
+    uart_puts(msg);
+    uart_puts(":\n");
+    uart_puts("\tbootable  = ");
+    uart_puts(p->bootable_p ? "true" : "false");
+    uart_puts("\n");
+    uart_puts("\tchs_start = ");
+    uart_putx(p->chs_start);
+    uart_puts("\n");
+    uart_puts("\tpart type = ");
+    uart_putx(p->part_type);
+    uart_puts(" (");
+    uart_puts(mbr_part_str(p->part_type));
+    uart_puts(")\n");
+    uart_puts("\tchs_end   = ");
+    uart_putx(p->chs_end);
     assert(p->part_type == 0xb || p->part_type == 0xc);
 }

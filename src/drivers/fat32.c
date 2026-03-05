@@ -1,7 +1,8 @@
-#include "rpi.h"
 #include "fat32.h"
+#include "heap_allocator.h"
 #include "fat32-helpers.h"
 #include "pi-sd.h"
+#include "uart.h"
 
 // Print extra tracing info when this is enabled.  You can and should add your
 // own.
@@ -12,7 +13,7 @@ fat32_boot_sec_t boot_sector;
 
 
 fat32_fs_t fat32_mk(mbr_partition_ent_t *partition) {
-  demand(!init_p, "the fat32 module is already in use\n");
+  assert(!init_p, "the fat32 module is already in use\n");
   // TODO: Read the boot sector (of the partition) off the SD card.
   unimplemented();
 
@@ -85,7 +86,7 @@ static uint32_t cluster_to_lba(fat32_fs_t *f, uint32_t cluster_num) {
 }
 
 pi_dirent_t fat32_get_root(fat32_fs_t *fs) {
-  demand(init_p, "fat32 not initialized!");
+  assert(init_p, "fat32 not initialized!");
   // TODO: return the information corresponding to the root directory (just
   // cluster_id, in this case)
   unimplemented();
@@ -151,8 +152,8 @@ static fat32_dirent_t *get_dirents(fat32_fs_t *fs, uint32_t cluster_start, uint3
 }
 
 pi_directory_t fat32_readdir(fat32_fs_t *fs, pi_dirent_t *dirent) {
-  demand(init_p, "fat32 not initialized!");
-  demand(dirent->is_dir_p, "tried to readdir a file!");
+  assert(init_p, "fat32 not initialized!");
+  assert(dirent->is_dir_p, "tried to readdir a file!");
   // TODO: use `get_dirents` to read the raw dirent structures from the disk
   uint32_t n_dirents;
   fat32_dirent_t *dirents = get_dirents(fs, dirent->cluster_id, &n_dirents);
@@ -182,8 +183,8 @@ static int find_dirent_with_name(fat32_dirent_t *dirents, int n, char *filename)
 }
 
 pi_dirent_t *fat32_stat(fat32_fs_t *fs, pi_dirent_t *directory, char *filename) {
-  demand(init_p, "fat32 not initialized!");
-  demand(directory->is_dir_p, "tried to use a file as a directory");
+  assert(init_p, "fat32 not initialized!");
+  assert(directory->is_dir_p, "tried to use a file as a directory");
 
   // TODO: use `get_dirents` to read the raw dirent structures from the disk
   unimplemented();
@@ -201,8 +202,8 @@ pi_dirent_t *fat32_stat(fat32_fs_t *fs, pi_dirent_t *directory, char *filename) 
 
 pi_file_t *fat32_read(fat32_fs_t *fs, pi_dirent_t *directory, char *filename) {
   // This should be pretty similar to readdir, but simpler.
-  demand(init_p, "fat32 not initialized!");
-  demand(directory->is_dir_p, "tried to use a file as a directory!");
+  assert(init_p, "fat32 not initialized!");
+  assert(directory->is_dir_p, "tried to use a file as a directory!");
 
   // TODO: read the dirents of the provided directory and look for one matching the provided name
   unimplemented();
@@ -217,7 +218,7 @@ pi_file_t *fat32_read(fat32_fs_t *fs, pi_dirent_t *directory, char *filename) {
   unimplemented();
 
   // TODO: fill the pi_file_t
-  pi_file_t *file = kmalloc(sizeof(pi_file_t));
+  pi_file_t *file = heap_alloc(sizeof(pi_file_t));
   *file = (pi_file_t) {
     .data = NULL,
     .n_data = 0,
@@ -296,7 +297,7 @@ int fat32_rename(fat32_fs_t *fs, pi_dirent_t *directory, char *oldname, char *ne
   // on success.
   // Consider:
   //  - what do you do when there's already a file with the new name?
-  demand(init_p, "fat32 not initialized!");
+  assert(init_p, "fat32 not initialized!");
   if (trace_p) trace("renaming %s to %s\n", oldname, newname);
   if (!fat32_is_valid_name(newname)) return 0;
 
@@ -315,7 +316,7 @@ int fat32_rename(fat32_fs_t *fs, pi_dirent_t *directory, char *oldname, char *ne
 
 // Create a new directory entry for an empty file (or directory).
 pi_dirent_t *fat32_create(fat32_fs_t *fs, pi_dirent_t *directory, char *filename, int is_dir) {
-  demand(init_p, "fat32 not initialized!");
+  assert(init_p, "fat32 not initialized!");
   if (trace_p) trace("creating %s\n", filename);
   if (!fat32_is_valid_name(filename)) return NULL;
 
@@ -343,7 +344,7 @@ pi_dirent_t *fat32_create(fat32_fs_t *fs, pi_dirent_t *directory, char *filename
 
 // Delete a file, including its directory entry.
 int fat32_delete(fat32_fs_t *fs, pi_dirent_t *directory, char *filename) {
-  demand(init_p, "fat32 not initialized!");
+  assert(init_p, "fat32 not initialized!");
   if (trace_p) trace("deleting %s\n", filename);
   if (!fat32_is_valid_name(filename)) return 0;
   // TODO: look for a matching directory entry, and set the first byte of the
@@ -359,7 +360,7 @@ int fat32_delete(fat32_fs_t *fs, pi_dirent_t *directory, char *filename) {
 }
 
 int fat32_truncate(fat32_fs_t *fs, pi_dirent_t *directory, char *filename, unsigned length) {
-  demand(init_p, "fat32 not initialized!");
+  assert(init_p, "fat32 not initialized!");
   if (trace_p) trace("truncating %s\n", filename);
 
   // TODO: edit the directory entry of the file to list its length as `length` bytes,
@@ -376,8 +377,8 @@ int fat32_truncate(fat32_fs_t *fs, pi_dirent_t *directory, char *filename, unsig
 }
 
 int fat32_write(fat32_fs_t *fs, pi_dirent_t *directory, char *filename, pi_file_t *file) {
-  demand(init_p, "fat32 not initialized!");
-  demand(directory->is_dir_p, "tried to use a file as a directory!");
+  assert(init_p, "fat32 not initialized!");
+  assert(directory->is_dir_p, "tried to use a file as a directory!");
 
   // TODO: Surprisingly, this one should be rather straightforward now.
   // - load the directory
@@ -392,7 +393,7 @@ int fat32_write(fat32_fs_t *fs, pi_dirent_t *directory, char *filename, pi_file_
 }
 
 int fat32_flush(fat32_fs_t *fs) {
-  demand(init_p, "fat32 not initialized!");
+  assert(init_p, "fat32 not initialized!");
   // no-op
   return 0;
 }

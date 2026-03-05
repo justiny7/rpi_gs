@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 #ifndef __RPI_FAT32_HELPERS_H__
 #define __RPI_FAT32_HELPERS_H__
 /* 

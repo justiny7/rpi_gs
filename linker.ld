@@ -37,5 +37,8 @@ SECTIONS
         *(COMMON)
         . = ALIGN(16);
         __bss_end__ = .;
+        . = ALIGN(8);
+        __prog_end__ = .;
+        __heap_start__ = .;
     }
 }

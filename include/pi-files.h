@@ -1,6 +1,8 @@
 #ifndef __RPI_FILES_H__
 #define __RPI_FILES_H__
 
+#include <stdlib.h>
+
 // A memory representation of a file.
 // There are better ways to do this (which don't involve reading the entire
 // file into RAM), but this is a simple way to start.

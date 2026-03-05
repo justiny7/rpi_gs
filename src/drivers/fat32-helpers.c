@@ -1,6 +1,7 @@
-#include "rpi.h"
 #include "fat32.h"
 #include "fat32-helpers.h"
+#include "uart.h"
+#include "lib.h"
 
 /******************************************************************************
  * boot record helpers.
@@ -12,29 +13,28 @@ static int is_fat32(int t) { return t == 0xb; }
 void fat32_volume_id_check(fat32_boot_sec_t *b) {
     // has to be a multiple of 512 or the sd.c driver won't really work.
     // currently assume 512
-    assert(b->bytes_per_sec == 512);
-    assert(b->nfats == 2);
-    assert(b->sig == 0xAA55);
-
-    assert(is_pow2(b->sec_per_cluster));
+    assert(b->bytes_per_sec == 512, "bytes_per_sec is not 512");
+    assert(b->nfats == 2, "nfats is not 2");
+    assert(b->sig == 0xAA55, "sig is not 0xAA55");
+    assert(is_pow2(b->sec_per_cluster), "sec_per_cluster is not a power of 2");
     unsigned n = b->bytes_per_sec;
-    assert(n == 512 || n == 1024 || n == 2048 || n == 4096);
-    assert(!b->max_files);
+    assert(n == 512 || n == 1024 || n == 2048 || n == 4096, "bytes_per_sec is not 512, 1024, 2048, or 4096");
+    assert(!b->max_files, "max_files is not 0");
     // 0 if size does not fit in 2bytes, which should always be true.
-    assert(b->fs_nsec == 0);
+    assert(b->fs_nsec == 0, "fs_nsec is not 0");
     // removable disk.
-    // assert(b->media_type == 0xf0);
-    assert(b->zero == 0);
-    assert(b->nsec_in_fs != 0);
-
+    // assert(b->media_type == 0xf0, "media_type is not 0xf0");
+    assert(b->zero == 0, "zero is not 0");
+    assert(b->nsec_in_fs != 0, "nsec_in_fs is 0");
     // usually these apparently.
-    assert(b->info_sec_num == 1);
-    assert(b->backup_boot_loc == 6);
-    assert(b->extended_sig == 0x29);
+    assert(b->info_sec_num == 1, "info_sec_num is not 1");
+    assert(b->backup_boot_loc == 6, "backup_boot_loc is not 6");
+    assert(b->extended_sig == 0x29, "extended_sig is not 0x29");
 }
 
 void fat32_volume_id_print(const char *msg, fat32_boot_sec_t *b) {
-    printk("%s:\n", msg);
+    uart_puts(msg);
+    uart_puts(":\n");
     char oem[9];
     memcpy(oem, b->oem, 8);
     oem[8] = 0;
@@ -44,30 +44,42 @@ void fat32_volume_id_print(const char *msg, fat32_boot_sec_t *b) {
     char type[9];
     memcpy(type, b->fs_type, 8);
     type[8] = 0;
-    printk("\toem               = <%s>\n", oem);
-    printk("\tbytes_per_sec     = %d\n", b->bytes_per_sec);
-    printk("\tsec_per_cluster   = %d\n", b->sec_per_cluster);
-    printk("\treserved size     = %d\n", b->reserved_area_nsec);
-    printk("\tnfats             = %d\n", b->nfats);
-    printk("\tmax_files         = %d\n", b->max_files);
-    printk("\tfs n sectors      = %d\n", b->fs_nsec);
-    printk("\tmedia type        = %x\n", b->media_type);
-    printk("\tsec per track     = %d\n", b->sec_per_track);
-    printk("\tn heads           = %d\n", b->n_heads);
-    printk("\tn hidden secs     = %d\n", b->hidden_secs);
-    printk("\tn nsec in FS      = %d\n", b->nsec_in_fs);
-    printk("\tn nsec per fat    = %d\n", b->nsec_per_fat);
-    printk("\tn mirror flags    = %b\n", b->mirror_flags);
-    printk("\tn version         = %d\n", b->version);
-    printk("\tn first_cluster   = %d\n", b->first_cluster);
-    printk("\tn info_sec_num    = %d\n", b->info_sec_num);
-    printk("\tn back_boot_loc   = %d\n", b->backup_boot_loc);
-    printk("\tn logical_drive_num= %d\n", b->logical_drive_num);
-    printk("\tn extended sig    = %x\n", b->extended_sig);
-    printk("\tn serial_num      = %x\n", b->serial_num);
-    printk("\tn volume label    = <%s>\n", label);
-    printk("\tn fs_type         = <%s>\n", type);
-    printk("\tn sig             = %x\n", b->sig);
+    uart_puts(" \toem               = <");
+    uart_puts(oem);
+    uart_puts(">\n");
+    uart_puts(" \tbytes_per_sec     = ");
+    uart_putd(b->bytes_per_sec);
+    uart_puts("\n");
+    uart_puts(" \tsec_per_cluster   = ");
+    uart_putd(b->sec_per_cluster);
+    uart_puts("\n");
+    uart_puts(" \treserved size     = ");
+    uart_putd(b->reserved_area_nsec);
+    uart_puts("\n");
+    uart_puts(" \tnfats             = ");
+    uart_putd(b->nfats);
+    uart_puts("\n");
+    uart_puts(" \tmax_files         = ");
+    uart_putd(b->max_files);
+    uart_puts("\n");
+    uart_puts(" \tfs n sectors      = ");
+    uart_putd(b->fs_nsec);
+    uart_puts("\n");
+    uart_puts(" \tmedia type        = ");
+    uart_putx(b->media_type);
+    uart_puts("\n");
+    uart_puts(" \tsec per track     = ");
+    uart_putd(b->sec_per_track);
+    uart_puts("\n");
+    uart_puts(" \tn heads           = ");
+    uart_putd(b->n_heads);
+    uart_puts("\n");
+    uart_puts(" \tn hidden secs     = ");
+    uart_putd(b->hidden_secs);
+    uart_puts("\n");
+    uart_puts(" \tn nsec in FS      = ");
+    uart_putd(b->nsec_in_fs);
+    uart_puts("\n");
     fat32_volume_id_check(b);
 }
 
@@ -75,18 +87,29 @@ void fat32_volume_id_print(const char *msg, fat32_boot_sec_t *b) {
  * fsinfo helpers.
  */
 void fat32_fsinfo_print(const char *msg, struct fsinfo *f) {
-    printk("%s:\n", msg);
-    printk("\tsig1              = %x\n", f->sig1);
-    printk("\tsig2              = %x\n", f->sig2);
-    printk("\tsig3              = %x\n", f->sig3);
-    printk("\tfree cluster cnt  = %d\n", f->free_cluster_count);
-    printk("\tnext free cluster = %x\n", f->next_free_cluster);
+    uart_puts(msg);
+    uart_puts(":\n");
+    uart_puts(" \tsig1              = ");
+    uart_putx(f->sig1);
+    uart_puts("\n");
+    uart_puts(" \tsig2              = ");
+    uart_putx(f->sig2);
+    uart_puts("\n");
+    uart_puts(" \tsig3              = ");
+    uart_putx(f->sig3);
+    uart_puts("\n");
+    uart_puts(" \tfree cluster cnt  = ");
+    uart_putd(f->free_cluster_count);
+    uart_puts("\n");
+    uart_puts(" \tnext free cluster = ");
+    uart_putx(f->next_free_cluster);
+    uart_puts("\n");
 }
 
 void fat32_fsinfo_check(struct fsinfo *info) {
-    assert(info->sig1 ==  0x41615252);
-    assert(info->sig2 ==  0x61417272);
-    assert(info->sig3 ==  0xaa550000);
+    assert(info->sig1 ==  0x41615252, "sig1 is not 0x41615252");
+    assert(info->sig2 ==  0x61417272, "sig2 is not 0x61417272");
+    assert(info->sig3 ==  0xaa550000, "sig3 is not 0xaa550000");
 }
 
 
@@ -100,7 +123,10 @@ const char * fat32_fat_entry_type_str(uint32_t x) {
     case BAD_CLUSTER:       return "BAD_CLUSTER";
     case LAST_CLUSTER:      return "LAST_CLUSTER";
     case USED_CLUSTER:      return "USED_CLUSTER";
-    default: panic("bad value: %x\n", x);
+    default: uart_puts("bad value: ");
+    uart_putx(x);
+    uart_puts("\n");
+    panic("bad value");
     }
 }
 
@@ -116,10 +142,16 @@ int fat32_fat_entry_type(uint32_t x) {
     if(x >= 0x2 && x <= 0xFFFFFEF)
         return USED_CLUSTER;
     if(x >= 0xFFFFFF0 && x <= 0xFFFFFF6)
-        panic("reserved value: %x\n", x);
+        uart_puts("reserved value: ");
+    uart_putx(x);
+    uart_puts("\n");
+    panic("reserved value");
     if(x >=  0xFFFFFF8  && x <= 0xFFFFFFF)
         return LAST_CLUSTER;
-    panic("impossible type value: %x\n", x);
+    uart_puts("impossible type value: ");
+    uart_putx(x);
+    uart_puts("\n");
+    panic("impossible type value");
 }
 
 /****************************************************************************************
@@ -154,7 +186,10 @@ const char * fat32_dir_attr_str(int attr) {
     case FAT32_VOLUME_LABEL:    strcat(buf, " VOLUME LABEL"); break;
     case FAT32_DIR:             strcat(buf, " DIR"); break;
     case FAT32_ARCHIVE:         strcat(buf, " ARCHIVE"); break;
-    default: panic("unhandled attr=%x\n", attr);
+    default: uart_puts("unhandled attr=");
+    uart_putx(attr);
+    uart_puts("\n");
+    panic("unhandled attr");
     }
     return buf;
 }
@@ -215,7 +250,7 @@ int fat32_is_valid_name(char *name) {
 
 void fat32_dirent_set_name(fat32_dirent_t *d, char *name) {
   int n = strlen(name);
-  assert(fat32_is_valid_name(name));
+  assert(fat32_is_valid_name(name), "name is not valid");
   int has_dot = 0;
   for (int i = 0; i < n; i++) {
     if (name[i] == '.') has_dot = 1;
@@ -240,40 +275,54 @@ static const char *add_nul(const char filename[11]) {
 
 void fat32_dirent_print_helper(fat32_dirent_t *d) {
     if(fat32_dirent_free(d))  {
-        printk("\tdirent is not allocated\n");
+        uart_puts("\tdirent is not allocated\n");
         return;
     }
     if(d->attr == FAT32_LONG_FILE_NAME) {
-        printk("\tdirent is an LFN\n");
+        uart_puts("\tdirent is an LFN\n");
         return;
     }
     if(fat32_is_attr(d->attr, FAT32_ARCHIVE)) {
-        printk("[ARCHIVE]: asssuming short part of LFN:");
+        uart_puts("[ARCHIVE]: asssuming short part of LFN:");
     } else if(!fat32_is_attr(d->attr, FAT32_DIR)) {
-        printk("need to handle attr %x (%s)\n", d->attr, fat32_dir_attr_str(d->attr));
+        uart_puts("need to handle attr ");
+        uart_putx(d->attr);
+        uart_puts(" (");
+        uart_puts(fat32_dir_attr_str(d->attr));
+        uart_puts(")\n");
         if(fat32_is_attr(d->attr, FAT32_ARCHIVE))
             return;
     }
-    printk("\n");
-    printk("\tfilename      = raw=<%s> 8.3=<%s>\n", add_nul(d->filename),to_8dot3(d->filename));
-    printk("\tbyte version  = {");
+    uart_puts("\n");
+    uart_puts("\tfilename      = raw=");
+    uart_puts(add_nul(d->filename));
+    uart_puts("> 8.3=");
+    uart_puts(to_8dot3(d->filename));
+    uart_puts("\n");
+    uart_puts("\tbyte version  = {");
     for(int i = 0; i < sizeof d->filename; i++) {
         if(i==8) {
-            printk("\n"); printk("\t\t\t\t");
+            uart_puts("\n"); uart_puts("\t\t\t\t");
         }
-        printk("'%c'/%x,", d->filename[i],d->filename[i]);
+        uart_puts("'");
+        uart_putc(d->filename[i]);
+        uart_puts("'/");
+        uart_putx(d->filename[i]);
+        uart_puts(",");
     }
-    printk("}\n");
+    uart_puts("}\n");
         
-    printk("\tattr         = %x ", d->attr);
+    uart_puts("\tattr         = ");
+    uart_putx(d->attr);
+    uart_puts(" ");
     if(d->attr != FAT32_LONG_FILE_NAME) {
         if(d->attr&FAT32_RO)
-            printk(" [Read-only]\n");
+            uart_puts(" [Read-only]\n");
         if(d->attr&FAT32_HIDDEN)
-            printk(" [HIDDEN]\n");
+            uart_puts(" [HIDDEN]\n");
         if(d->attr&FAT32_SYSTEM_FILE)
-            printk(" [SYSTEM FILE: don't move]\n");
-        printk("\n");
+            uart_puts(" [SYSTEM FILE: don't move]\n");
+        uart_puts("\n");
     }
 #if 0
     // clutters output without much value (for lab 13 at least)
@@ -284,13 +333,20 @@ void fat32_dirent_print_helper(fat32_dirent_t *d) {
     printk("\tmod_time      = %d\n", d->mod_time);
     printk("\tmod_date      = %d\n", d->mod_date);
 #endif
-    printk("\thi_start      = %x\n", d->hi_start);
-    printk("\tlo_start      = %d\n", d->lo_start);
-    printk("\tfile_nbytes   = %d\n", d->file_nbytes);
+    uart_puts("\thi_start      = ");
+    uart_putx(d->hi_start);
+    uart_puts("\n");
+    uart_puts("\tlo_start      = ");
+    uart_putd(d->lo_start);
+    uart_puts("\n");
+    uart_puts("\tfile_nbytes   = ");
+    uart_putd(d->file_nbytes);
+    uart_puts("\n");
 }
 
 void fat32_dirent_print(const char *msg, fat32_dirent_t *d) {
-    printk("%s: ", msg);
+    uart_puts(msg);
+    uart_puts(": ");
     fat32_dirent_print_helper(d);
 }
 
@@ -312,29 +368,34 @@ int fat32_dir_lookup(const char *name, fat32_dirent_t *dirs, unsigned n) {
 
 // print [p, p+n) as a string: use for ascii filled files.
 void print_as_string(const char *msg, uint8_t *p, int n) {
-    printk("%s\n", msg);
+    uart_puts(msg);
+    uart_puts("\n");
     for(int i = 0; i < n; i++) {
         char c = p[i];
-        printk("%c", c);
+        uart_putc(c);
     }
-    printk("\n");
+    uart_puts("\n");
 }
 
 void print_bytes(const char *msg, uint8_t *p, int n) {
-    printk("%s\n", msg);
+    uart_puts(msg);
+    uart_puts("\n");
     for(int i = 0; i < n; i++) {
         if(i % 16 == 0)
-            printk("\n\t");
-        printk("%x, ", p[i]);
+            uart_puts("\n\t");
+        uart_putx(p[i]);
+        uart_puts(", ");
     }
-    printk("\n");
+    uart_puts("\n");
 }
 void print_words(const char *msg, uint32_t *p, int n) {
-    printk("%s\n", msg);
+    uart_puts(msg);
+    uart_puts("\n");
     for(int i = 0; i < n; i++) {
         if(i % 16 == 0)
-            printk("\n\t");
-        printk("0x%x, ", p[i]);
+            uart_puts("\n\t");
+        uart_putx(p[i]);
+        uart_puts(", ");
     }
-    printk("\n");
+    uart_puts("\n");
 }

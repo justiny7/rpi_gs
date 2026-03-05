@@ -1,6 +1,7 @@
 #ifndef __RPI_PI_SD_H__
 #define __RPI_PI_SD_H__
 
+#include <stdint.h>
 #define NBYTES_PER_SECTOR 512
 
 // initialize the PI SD driver
