@@ -6,7 +6,8 @@
 #include "arena_allocator.h"
 #include <stdint.h>
 
-#define MAX_GAUSSIANS 96000
+// #define MAX_GAUSSIANS 96000
+#define MAX_GAUSSIANS 4000000
 
 // SH coefficients as static const to avoid QEMU .rodata loading issues
 static const float SH_C0 = 0.28209479177387814f;

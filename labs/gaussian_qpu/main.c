@@ -21,8 +21,8 @@
 #define TILE_SIZE 16
 #define NUM_TILES (WIDTH * HEIGHT / (TILE_SIZE * TILE_SIZE))
 
+// #define NUM_QPUS 1
 #define NUM_QPUS 12
-// #define NUM_QPUS 12
 #define SIMD_WIDTH 16
 
 // #define VERBOSE
@@ -555,10 +555,10 @@ void count_intersections(ProjectedGaussianPtr* pg, int n,
 }
 
 void main() {
-    // const int num_gaussians = NUM_QPUS * SIMD_WIDTH * 20;
-    const int num_gaussians = NUM_QPUS * SIMD_WIDTH * 2;
+    const int num_gaussians = NUM_QPUS * SIMD_WIDTH * 10;
+    // const int num_gaussians = NUM_QPUS * SIMD_WIDTH * 1;
     const int MiB = 1024 * 1024;
-    arena_init(&data_arena, MiB * 40);
+    arena_init(&data_arena, MiB * 60);
 
     uint32_t t;
 
@@ -745,7 +745,7 @@ void main() {
         }
     }
     */
-    /*
+    // /*
     for (int i = 0; i < total_intersections; i++) {
         if (pg_all.tile[i] != pg_soa_all.tile[i]) {
             DEBUG_DM(i, "iter");
@@ -765,7 +765,7 @@ void main() {
             rpi_reset();
         }
     }
-    */
+    // */
 
     uint32_t *fb;
     uint32_t size, pitch;
