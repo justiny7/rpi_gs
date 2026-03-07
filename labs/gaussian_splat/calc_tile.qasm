@@ -22,8 +22,7 @@
 .set base_row, ra9          # (qpu_num * 4)
 .set loop_counter, rb5
 
-.set tile, ra10
-.set depth, ra11
+.set key, ra11
 .set id, ra12
 .set pg_indices, ra13
 .set pg_all_indices, ra14
@@ -49,8 +48,7 @@ mov depth_precomped, unif
 
 mov tiles_touched, unif
 
-mov tile, unif
-mov depth, unif
+mov key, unif
 mov id, unif
 
 .macro mem_to_vpm_vec16, addr_reg, offset
@@ -217,13 +215,14 @@ mov id, unif
     add r1, r1, lb
     add r1, r1, r0
 
-    # now write tile ID
-    reg_to_vpm_vec16 r1, 0
-    vpm_to_mem_vec16 tile, 0
-
+    # convert depth + tile to key
     ldtmu0
-    reg_to_vpm_vec16 r4, 1
-    vpm_to_mem_vec16 depth, 1
+    not r2, r4
+    shr r2, r2, 12
+    shl r1, r1, 20
+    or r1, r1, r2
+    reg_to_vpm_vec16 r1, 0
+    vpm_to_mem_vec16 key, 0
 .endm
 
 # loop counter (qpu_num * SIMD_WIDTH += stride until >= NUM_INTERSECTIONS)
@@ -240,8 +239,8 @@ shl base_row, qpu_num, 2
 
     # increment pointers += stride * sizeof(float), check if reached array end
     shl r0, stride, 2
-    add tile, tile, r0
-    add depth, depth, r0
+    # add tile, tile, r0
+    add key, key, r0
     add id, id, r0
 
     add r0, loop_counter, stride

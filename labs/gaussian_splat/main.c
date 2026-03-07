@@ -21,6 +21,8 @@
 // #define HEIGHT 720
 #define WIDTH 640
 #define HEIGHT 480
+// #define WIDTH 256
+// #define HEIGHT 192
 // #define WIDTH 128
 // #define HEIGHT 96
 #define TILE_SIZE 16
@@ -83,7 +85,6 @@ void sort(ProjectedGaussianPtr* pg, int n, ProjectedGaussianPtr* orig, uint32_t*
     uint32_t t;
 
     // key = tile (12 bits) | ~(upper 20 bits of depth)
-    // store key in pg->tile[]
     // depth bits are flipped bc we want depth descending
     // since we only have 12 bits for tile, we can only have max 4096 tiles
     uint32_t* temp_key = arena_alloc_align(&data_arena, n * sizeof(uint32_t), 16);
@@ -97,22 +98,20 @@ void sort(ProjectedGaussianPtr* pg, int n, ProjectedGaussianPtr* orig, uint32_t*
     t = sys_timer_get_usec();
     {   // pass 1
         for (int i = 0; i < n; i++) {
-            uint32_t dep = *((uint32_t*) &pg->depth[i]);
-            uint32_t til = pg->tile[i];
-            uint32_t key = (til << 20) | ((~dep) >> 12);
+            uint32_t key = pg->depth_key[i].key;
 
             cnt[key & 0xFFFF]++;
-            gaussians_touched[til + 1]++;
-            pg->tile[i] = key;
+            gaussians_touched[(key >> 20) + 1]++;
         }
 
         qpu_scan(cnt, 1 << 16);
 
         for (int i = n - 1; i >= 0; i--) {
-            int j = pg->tile[i] & 0xFFFF;
-            temp_key[cnt[j] - 1] = (pg->tile[i] >>= 16);
+            uint32_t key = pg->depth_key[i].key;
+            int j = key & 0xFFFF;
+            temp_key[cnt[j] - 1] = (key >>= 16);
             temp_id[--cnt[j]] = pg->radius_id[i].id;
-            cnt2[pg->tile[i]]++;
+            cnt2[key]++;
         }
     }
     uint32_t iter1_tot = sys_timer_get_usec() - t;
@@ -179,7 +178,7 @@ void precompute_gaussians_qpu(Camera* c, GaussianPtr* g, ProjectedGaussianPtr* p
         kernel_load_unif(&project_points_k, q, TO_BUS(g->pos_x + q * SIMD_WIDTH));
         kernel_load_unif(&project_points_k, q, TO_BUS(g->pos_y + q * SIMD_WIDTH));
         kernel_load_unif(&project_points_k, q, TO_BUS(g->pos_z + q * SIMD_WIDTH));
-        kernel_load_unif(&project_points_k, q, TO_BUS(pg->depth + q * SIMD_WIDTH));
+        kernel_load_unif(&project_points_k, q, TO_BUS(pg->depth_key + q * SIMD_WIDTH));
         kernel_load_unif(&project_points_k, q, TO_BUS(pg->screen_x + q * SIMD_WIDTH));
         kernel_load_unif(&project_points_k, q, TO_BUS(pg->screen_y + q * SIMD_WIDTH));
         kernel_load_unif(&project_points_k, q, TO_BUS(pg->radius_id + q * SIMD_WIDTH));
@@ -306,12 +305,11 @@ void count_intersections(ProjectedGaussianPtr* pg, int n,
         kernel_load_unif(&tile_k, q, TO_BUS(pg->screen_x));
         kernel_load_unif(&tile_k, q, TO_BUS(pg->screen_y));
         kernel_load_unif(&tile_k, q, TO_BUS(pg->radius_id));
-        kernel_load_unif(&tile_k, q, TO_BUS(pg->depth));
+        kernel_load_unif(&tile_k, q, TO_BUS(pg->depth_key));
 
         kernel_load_unif(&tile_k, q, TO_BUS(tiles_touched));
 
-        kernel_load_unif(&tile_k, q, TO_BUS(pg_all->tile + q * SIMD_WIDTH));
-        kernel_load_unif(&tile_k, q, TO_BUS(pg_all->depth + q * SIMD_WIDTH));
+        kernel_load_unif(&tile_k, q, TO_BUS(pg_all->depth_key + q * SIMD_WIDTH));
         // use radius as original Gaussian index bc we don't need it anymore for rendering
         kernel_load_unif(&tile_k, q, TO_BUS(pg_all->radius_id + q * SIMD_WIDTH));
     }
@@ -347,8 +345,8 @@ void caches_disable(void) {
 void main() {
     caches_enable();
 
-    const int num_gaussians = NUM_QPUS * SIMD_WIDTH * 20;
-    // const int num_gaussians = NUM_QPUS * SIMD_WIDTH * 2;
+    const int num_gaussians = NUM_QPUS * SIMD_WIDTH * 800;
+    // const int num_gaussians = NUM_QPUS * SIMD_WIDTH * 1;
     const int MiB = 1024 * 1024;
     arena_init(&data_arena, MiB * 230);
 
@@ -392,7 +390,9 @@ void main() {
         g.pos_y[i] = rand_float(-1.5f, 1.5f);
         g.pos_z[i] = rand_float(-2.0f, 2.0f);
         
-        float scale_f = rand_float(-2.0f, -0.5f);
+        float scale_f = rand_float(-3.5f, -2.5f);
+        // float scale_f = rand_float(-5.5, -4.5);
+        // float scale_f = -2.5;
         Vec3 scale = { { scale_f, scale_f, scale_f } };
         Vec4 rot = { { 0.0f, 0.0f, 0.0f, 1.0f } };
 
@@ -507,6 +507,9 @@ void main() {
     DEBUG_D(render_t);
 
     uart_puts("DONE RENDERING\n");
+
+    float MB_used = 1.0 * data_arena.size / MiB;
+    DEBUG_F(MB_used);
 
     caches_disable();
     while (1);

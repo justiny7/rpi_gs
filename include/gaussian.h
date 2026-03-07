@@ -81,7 +81,7 @@ typedef struct {
 typedef struct {
     float* screen_x;
     float* screen_y;
-    float* depth;
+    union { float depth; uint32_t key; }* depth_key;
     float* cov2d_inv_x;
     float* cov2d_inv_y;
     float* cov2d_inv_z;
@@ -90,7 +90,6 @@ typedef struct {
     float* color_b;
     float* opacity;
     union { float radius; uint32_t id; }* radius_id;
-    uint32_t* tile;
 
     uint32_t size;
 } ProjectedGaussianPtr;

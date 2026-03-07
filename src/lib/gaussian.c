@@ -28,7 +28,7 @@ void init_projected_gaussian_ptr(ProjectedGaussianPtr *p, Arena* a, uint32_t siz
     uint32_t align = 16 * sizeof(float);
     p->screen_x = arena_alloc_align(a, size * sizeof(float), align);
     p->screen_y = arena_alloc_align(a, size * sizeof(float), align);
-    p->depth = arena_alloc_align(a, size * sizeof(float), align);
+    p->depth_key = arena_alloc_align(a, size * sizeof(float), align);
     p->cov2d_inv_x = arena_alloc_align(a, size * sizeof(float), align);
     p->cov2d_inv_y = arena_alloc_align(a, size * sizeof(float), align);
     p->cov2d_inv_z = arena_alloc_align(a, size * sizeof(float), align);
@@ -37,7 +37,6 @@ void init_projected_gaussian_ptr(ProjectedGaussianPtr *p, Arena* a, uint32_t siz
     p->color_b = arena_alloc_align(a, size * sizeof(float), align);
     p->opacity = arena_alloc_align(a, size * sizeof(float), align);
     p->radius_id = arena_alloc_align(a, size * sizeof(float), align);
-    p->tile = arena_alloc_align(a, size * sizeof(uint32_t), align);
 
     p->size = size;
 }
