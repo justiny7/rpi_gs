@@ -85,8 +85,8 @@ $(BUILD_DIR)/lab/%.c.o: %.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OS_KERNEL_DIR)/%.c $(OS_KERNEL_DIR)/%.h &: $(OS_KERNEL_DIR)/%.qasm
-	/opt/homebrew/opt/vc4asm/bin/vc4asm -h $(OS_KERNEL_DIR)/$*.h -c $(OS_KERNEL_DIR)/$*.c $<
+# $(OS_KERNEL_DIR)/%.c $(OS_KERNEL_DIR)/%.h &: $(OS_KERNEL_DIR)/%.qasm
+# 	/opt/homebrew/opt/vc4asm/bin/vc4asm -h $(OS_KERNEL_DIR)/$*.h -c $(OS_KERNEL_DIR)/$*.c $<
 
 $(OS_OBJS): $(OS_SRCS_QASM:$(OS_KERNEL_DIR)/%.qasm=$(OS_KERNEL_DIR)/%.h)
 
