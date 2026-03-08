@@ -1,5 +1,5 @@
-#ifndef calc_bbox_H
-#define calc_bbox_H
+#ifndef render_H
+#define render_H
 
 #include <inttypes.h>
 
@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-extern uint32_t calc_bbox[172];
+extern uint32_t render[1454];
 
 
 #ifdef __cplusplus

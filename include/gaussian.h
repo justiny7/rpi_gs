@@ -30,6 +30,7 @@ static const float SH_C3[] = {
     -0.5900435899266435f
 };
 
+/*
 typedef struct {
     Vec3 pos;
     Vec3 scale;
@@ -37,6 +38,24 @@ typedef struct {
     float opacity;
     Vec3 sh[16];
 } Gaussian;
+*/
+
+// /*
+typedef struct __attribute((packed, aligned(4))) {
+    float pos_x;
+    float pos_y;
+    float pos_z;
+    float sh[48];
+    float opacity;
+    float scale_x;
+    float scale_y;
+    float scale_z;
+    float rot_w;
+    float rot_x;
+    float rot_y;
+    float rot_z;
+} Gaussian;
+// */
 
 typedef struct {
     Vec3 pos[MAX_GAUSSIANS];

@@ -2,7 +2,7 @@
  * Referenced https://github.com/bztsrc/raspi3-tutorial/tree/master/0D_readfile
  */
 
-#include "sd.h"
+#include "emmc.h"
 #include "uart.h"
 
 /* memcmp for freestanding build (-nostdlib); no libc */
@@ -76,9 +76,11 @@ int fat_getpartition(void)
             uart_puts("ERROR: Bad magic in MBR\n");
             return 0;
         }
-        // check partition type (FAT32 LBA only)
-        if(mbr[0x1C2]!=0xC/*FAT32 LBA*/) {
-            uart_puts("ERROR: Wrong partition type (need FAT32)\n");
+        // check partition type: 0x0B = FAT32 CHS, 0x0C = FAT32 LBA
+        if(mbr[0x1C2]!=0xB && mbr[0x1C2]!=0xC) {
+            uart_puts("ERROR: Wrong partition type (need FAT32, got 0x");
+            uart_hex(mbr[0x1C2]);
+            uart_puts(")\n");
             return 0;
         }
         // should be this, but compiler generates bad code...

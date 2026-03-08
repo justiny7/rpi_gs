@@ -7,8 +7,6 @@
 #include "math.h"
 #include "debug.h"
 #include "kernel.h"
-#include "emmc.h"
-#include "fat.h"
 
 #include "project_points_cov2d_inv.h"
 #include "spherical_harmonics.h"
@@ -19,13 +17,10 @@
 #include "scan_rot.h"
 #include "scan_sum.h"
 
-#define SCALE 10.0
-#define LG_SCALE 2.30258509299
-
-#define WIDTH 1280
-#define HEIGHT 720
-// #define WIDTH 640
-// #define HEIGHT 480
+// #define WIDTH 1280
+// #define HEIGHT 720
+#define WIDTH 640
+#define HEIGHT 480
 // #define WIDTH 256
 // #define HEIGHT 192
 // #define WIDTH 128
@@ -36,53 +31,23 @@
 #define NUM_QPUS 12
 #define SIMD_WIDTH 16
 
-#define FILE_NAME "FLY     PLY"
-// #define FILE_NAME "CACTUS  PLY"
-
 Arena data_arena;
 Kernel project_points_k, sh_k, bbox_k, tile_k, sort_copy_k, render_k;
 Kernel scan_rot_k, scan_sum_k;
 
-GaussianPtr g;
-ProjectedGaussianPtr pg, pg_all;
+static uint32_t rand_state = 12345;
 
-
-void init_kernels() {
-    kernel_init(&project_points_k, NUM_QPUS, 35,
-            project_points_cov2d_inv, sizeof(project_points_cov2d_inv));
-    kernel_init(&sh_k, NUM_QPUS, 60,
-            spherical_harmonics, sizeof(spherical_harmonics));
-    kernel_init(&bbox_k, NUM_QPUS, 13,
-            calc_bbox, sizeof(calc_bbox));
-    kernel_init(&tile_k, NUM_QPUS, 14,
-            calc_tile, sizeof(calc_tile));
-    kernel_init(&sort_copy_k, NUM_QPUS, 22,
-            sort_copy, sizeof(sort_copy));
-    kernel_init(&render_k, NUM_QPUS, 16,
-            render, sizeof(render));
-
-    kernel_init(&scan_rot_k, NUM_QPUS, 4,
-            scan_rot, sizeof(scan_rot));
-    kernel_init(&scan_sum_k, NUM_QPUS, 5,
-            scan_sum, sizeof(scan_sum));
+static uint32_t rand_u32(void) {
+    rand_state = rand_state * 1103515245 + 12345;
+    return rand_state;
 }
 
-void free_kernels() {
-    kernel_free(&project_points_k);
-    kernel_free(&sh_k);
-    kernel_free(&bbox_k);
-    kernel_free(&tile_k);
-    kernel_free(&sort_copy_k);
-    kernel_free(&render_k);
-    kernel_free(&scan_rot_k);
-    kernel_free(&scan_sum_k);
+static float rand_float(float min, float max) {
+    return min + (float)(rand_u32() & 0xFFFF) / 65535.0f * (max - min);
 }
 
 void qpu_scan(uint32_t* arr, int n) {
     assert((n & 0xF) == 0, "N must be divisble by 16 for scan");
-    assert(n >= NUM_QPUS * SIMD_WIDTH, "N too small for QPU scan");
-
-    uint32_t arena_size = data_arena.size;
 
     kernel_reset_unifs(&scan_rot_k);
 
@@ -96,7 +61,7 @@ void qpu_scan(uint32_t* arr, int n) {
 
     kernel_execute(&scan_rot_k);
 
-    uint32_t* pref = arena_alloc_align(&data_arena, n * sizeof(uint32_t), 16 * sizeof(uint32_t));
+    uint32_t* pref = arena_alloc_align(&data_arena, n * sizeof(uint32_t), 16);
     pref[0] = 0;
     for (int i = 0; i + SIMD_WIDTH < n; i += SIMD_WIDTH) {
         pref[i + SIMD_WIDTH] = pref[i] + arr[i + SIMD_WIDTH - 1];
@@ -114,23 +79,19 @@ void qpu_scan(uint32_t* arr, int n) {
     }
 
     kernel_execute(&scan_sum_k);
-
-    arena_dealloc_to(&data_arena, arena_size);
 }
 
 void sort(ProjectedGaussianPtr* pg, int n, ProjectedGaussianPtr* orig, uint32_t* gaussians_touched) {
     uint32_t t;
-    uint32_t arena_size = data_arena.size;
 
     // key = tile (12 bits) | ~(upper 20 bits of depth)
     // depth bits are flipped bc we want depth descending
     // since we only have 12 bits for tile, we can only have max 4096 tiles
+    uint32_t* temp_key = arena_alloc_align(&data_arena, n * sizeof(uint32_t), 16);
+    uint32_t* temp_id = arena_alloc_align(&data_arena, n * sizeof(uint32_t), 16);
 
-    uint32_t* temp_key = arena_alloc_align(&data_arena, n * sizeof(uint32_t), 16 * sizeof(uint32_t));
-    uint32_t* temp_id = arena_alloc_align(&data_arena, n * sizeof(uint32_t), 16 * sizeof(uint32_t));
-
-    uint32_t* cnt = arena_alloc_align(&data_arena, (1 << 16) * sizeof(uint32_t), 16 * sizeof(uint32_t));
-    uint32_t* cnt2 = arena_alloc_align(&data_arena, (1 << 16) * sizeof(uint32_t), 16 * sizeof(uint32_t));
+    uint32_t* cnt = arena_alloc_align(&data_arena, (1 << 16) * sizeof(uint32_t), 16);
+    uint32_t* cnt2 = arena_alloc_align(&data_arena, (1 << 16) * sizeof(uint32_t), 16);
     memset(cnt, 0, sizeof(cnt));
     memset(cnt2, 0, sizeof(cnt2));
 
@@ -199,18 +160,11 @@ void sort(ProjectedGaussianPtr* pg, int n, ProjectedGaussianPtr* orig, uint32_t*
     DEBUG_D(iter2_tot);
 
     t = sys_timer_get_usec();
-    if (NUM_TILES + 1 < NUM_QPUS * SIMD_WIDTH) {
-        for (int i = 0; i < NUM_TILES; i++) {
-            gaussians_touched[i + 1] += gaussians_touched[i];
-        }
-    } else {
-        qpu_scan(gaussians_touched, (NUM_TILES + 1 + 15) & ~0xF);
+    for (int i = 0; i < NUM_TILES; i++) {
+        gaussians_touched[i + 1] += gaussians_touched[i];
     }
-
     uint32_t prefsum_tot = sys_timer_get_usec() - t;
     DEBUG_D(prefsum_tot);
-
-    arena_dealloc_to(&data_arena, arena_size);
 }
 
 void precompute_gaussians_qpu(Camera* c, GaussianPtr* g, ProjectedGaussianPtr* pg, uint32_t num_gaussians) {
@@ -254,6 +208,8 @@ void precompute_gaussians_qpu(Camera* c, GaussianPtr* g, ProjectedGaussianPtr* p
     uint32_t project_points_kernel_t  = sys_timer_get_usec() - t;
     DEBUG_D(project_points_kernel_t);
 
+    kernel_free(&project_points_k);
+
     ////////// SPHERICAL HARMONICS
     kernel_reset_unifs(&sh_k);
     float** sh[3] = {
@@ -292,6 +248,8 @@ void precompute_gaussians_qpu(Camera* c, GaussianPtr* g, ProjectedGaussianPtr* p
     kernel_execute(&sh_k);
     uint32_t sh_kernel_t = sys_timer_get_usec() - t;
     DEBUG_D(sh_kernel_t);
+
+    kernel_free(&sh_k);
 }
 
 void count_intersections(ProjectedGaussianPtr* pg, int n,
@@ -322,12 +280,15 @@ void count_intersections(ProjectedGaussianPtr* pg, int n,
     uint32_t bbox_kernel_t = sys_timer_get_usec() - t;
     DEBUG_D(bbox_kernel_t);
 
-    qpu_scan(tiles_touched, (n + 1 + 15) & ~0xF);
+    kernel_free(&bbox_k);
+
+    for (int i = 0; i < n; i++) {
+        tiles_touched[i + 1] += tiles_touched[i];
+    }
 
     ///////// DUPLICATE GAUSSIANS + CALC TILE IDS
 
     uint32_t num_intersections = tiles_touched[n];
-    DEBUG_D(num_intersections);
     init_projected_gaussian_ptr(pg_all, &data_arena, num_intersections);
 
     kernel_reset_unifs(&tile_k);
@@ -357,14 +318,16 @@ void count_intersections(ProjectedGaussianPtr* pg, int n,
     kernel_execute(&tile_k);
     uint32_t tile_kernel_t = sys_timer_get_usec() - t;
     DEBUG_D(tile_kernel_t);
+
+    kernel_free(&tile_k);
 }
 
 void caches_enable(void) {
     unsigned r;
     asm volatile ("MRC p15, 0, %0, c1, c0, 0" : "=r" (r));
-    r |= (1 << 12); // l1 instruction cache
-    r |= (1 << 11); // branch prediction
-    r |= (1 << 2); // data cache
+	r |= (1 << 12); // l1 instruction cache
+	r |= (1 << 11); // branch prediction
+	r |= (1 << 2); // data cache
     asm volatile ("MCR p15, 0, %0, c1, c0, 0" :: "r" (r));
 }
 
@@ -373,133 +336,68 @@ void caches_disable(void) {
     unsigned r;
     asm volatile ("MRC p15, 0, %0, c1, c0, 0" : "=r" (r));
     //r |= 0x1800;
-    r &= ~(1 << 12); // l1 instruction cache
-    r &= ~(1 << 11); // branch prediction
-    r &= ~(1 << 2); // data cache
+	r &= ~(1 << 12); // l1 instruction cache
+	r &= ~(1 << 11); // branch prediction
+	r &= ~(1 << 2); // data cache
     asm volatile ("MCR p15, 0, %0, c1, c0, 0" :: "r" (r));
 }
 
-void init_sd(char** data_ptr, uint32_t* filesize_ptr) {
-    if (sd_init() != SD_OK) {
-        uart_puts("ERROR: SD init failed\n");
-        rpi_reset();
-    }
-    uart_puts("SD init OK\n");
+void main() {
+    caches_enable();
 
-    if (!fat_getpartition()) {
-        uart_puts("ERROR: FAT partition not found\n");
-        rpi_reset();
-    }
-    uart_puts("FAT partition OK\n");
+    const int num_gaussians = NUM_QPUS * SIMD_WIDTH * 800;
+    // const int num_gaussians = NUM_QPUS * SIMD_WIDTH * 1;
+    const int MiB = 1024 * 1024;
+    arena_init(&data_arena, MiB * 230);
 
-    unsigned int file_size = 0;
-    unsigned int cluster = fat_getcluster(FILE_NAME, &file_size);
-    if (cluster == 0) {
-        uart_puts("ERROR: File not found: " FILE_NAME "\n");
-        rpi_reset();
-    }
+    // set up kernels
+    kernel_init(&project_points_k, NUM_QPUS, 35,
+            project_points_cov2d_inv, sizeof(project_points_cov2d_inv));
+    kernel_init(&sh_k, NUM_QPUS, 60,
+            spherical_harmonics, sizeof(spherical_harmonics));
+    kernel_init(&bbox_k, NUM_QPUS, 13,
+            calc_bbox, sizeof(calc_bbox));
+    kernel_init(&tile_k, NUM_QPUS, 14,
+            calc_tile, sizeof(calc_tile));
+    kernel_init(&sort_copy_k, NUM_QPUS, 22,
+        sort_copy, sizeof(sort_copy));
+    kernel_init(&render_k, NUM_QPUS, 16,
+            render, sizeof(render));
 
-    unsigned int bytes_read = 0;
-    char* data = fat_readfile(cluster, &bytes_read);
-    if (data == 0) {
-        uart_puts("ERROR: Failed to read file\n");
-        rpi_reset();
-    }
+    kernel_init(&scan_rot_k, NUM_QPUS, 4,
+        scan_rot, sizeof(scan_rot));
+    kernel_init(&scan_sum_k, NUM_QPUS, 5,
+        scan_sum, sizeof(scan_sum));
 
-    uart_puts("File size: ");
-    uart_putd(file_size);
-    uart_puts(" bytes, read: ");
-    uart_putd(bytes_read);
-    uart_puts(" bytes\n");
+    uint32_t t;
 
-    *data_ptr = data;
-    *filesize_ptr = file_size;
-}
+    Vec3 cam_pos = { { 0.0f, 0.0f, 5.0f } };
+    // Vec3 cam_pos = { { 0.0f, 0.0f, 100.f } };
+    Vec3 cam_target = { { 0.0f, 0.0f, 0.0f } };
+    Vec3 cam_up = { { 0.0f, 1.0f, 0.0f } };
 
-void read_gaussians(uint32_t* num_gaussians_ptr,
-        float* x_avg_ptr, float* y_avg_ptr, float* z_avg_ptr) {
+    Camera* c = arena_alloc_align(&data_arena, sizeof(Camera), 16);
+    init_camera(c, cam_pos, cam_target, cam_up, WIDTH, HEIGHT);
 
-    char* data;
-    uint32_t filesize;
-    init_sd(&data, &filesize);
-
-    const char* vertex_count = "vertex ";
-    const char* end_header = "end_header\n";
-
-    int st = 0;
-    for (; ; st++) {
-        int f = 0;
-        for (int j = 0; j < 7; j++) {
-            if (data[st + j] != vertex_count[j]) {
-                f = 1;
-                break;
-            }
-        }
-
-        if (!f) {
-            break;
-        }
-    }
-    st += 7;
-
-    uint32_t num_gaussians = 0;
-    while (data[st] != '\n') {
-        num_gaussians = num_gaussians * 10 + (data[st++] - '0');
-    }
-
+    GaussianPtr g;
     init_gaussian_ptr(&g, &data_arena, num_gaussians);
+
+    ProjectedGaussianPtr pg;
     init_projected_gaussian_ptr(&pg, &data_arena, num_gaussians);
 
-    for (; ; st++) {
-        int f = 0;
-        for (int j = 0; j < 11; j++) {
-            if (data[st + j] != end_header[j]) {
-                f = 1;
-                break;
-            }
-        }
-
-        if (!f) {
-            break;
-        }
-    }
-
-    st += 11;
-    assert(st + num_gaussians * sizeof(Gaussian) == filesize, "ply file size mismatch");
-
-    float x_avg = 0.0f, y_avg = 0.0f, z_avg = 0.0f;
-    for (uint32_t i = 0; i < num_gaussians; i++) {
-        Gaussian gaus;
-        memcpy(&gaus, data + st, sizeof(Gaussian));
-
-        g.pos_x[i] = gaus.pos_x * SCALE;
-        g.pos_y[i] = gaus.pos_y * SCALE;
-        g.pos_z[i] = gaus.pos_z * SCALE;
-
-        x_avg += g.pos_x[i];
-        y_avg += g.pos_y[i];
-        z_avg += g.pos_z[i];
-
-        for (int j = 0; j < 16; j++) {
-            if (j < 1) {
-                g.sh_x[j][i] = gaus.sh[j * 3 + 0];
-                g.sh_y[j][i] = gaus.sh[j * 3 + 1];
-                g.sh_z[j][i] = gaus.sh[j * 3 + 2];
-            } else {
-                g.sh_x[j][i] = 0;
-                g.sh_y[j][i] = 0;
-                g.sh_z[j][i] = 0;
-            }
-        }
-
-        pg.opacity[i] = 1.0 / (1.0 + expf(-gaus.opacity));
-
-        Vec3 scale = { { gaus.scale_x, gaus.scale_y, gaus.scale_z } };
-        scale = vec3_sadd(scale, LG_SCALE);
-        Vec4 rot = { { gaus.rot_x, gaus.rot_y, gaus.rot_z, gaus.rot_w } };
-        assert((1.0 - vec4_len(rot)) < 0.001f, "rot not normalized");
+    for (int i = 0; i < num_gaussians; i++) {
+        g.pos_x[i] = rand_float(-2.0f, 2.0f);
+        g.pos_y[i] = rand_float(-1.5f, 1.5f);
+        g.pos_z[i] = rand_float(-2.0f, 2.0f);
+        
+        float scale_f = rand_float(-3.5f, -2.5f);
+        // float scale_f = rand_float(-5.5, -4.5);
+        // float scale_f = -2.5;
+        Vec3 scale = { { scale_f, scale_f, scale_f } };
+        Vec4 rot = { { 0.0f, 0.0f, 0.0f, 1.0f } };
 
         Mat3 cov3d_m = compute_cov3d(scale, rot);
+
         g.cov3d[0][i] = cov3d_m.m[0];
         g.cov3d[1][i] = cov3d_m.m[1];
         g.cov3d[2][i] = cov3d_m.m[2];
@@ -507,51 +405,21 @@ void read_gaussians(uint32_t* num_gaussians_ptr,
         g.cov3d[4][i] = cov3d_m.m[5];
         g.cov3d[5][i] = cov3d_m.m[8];
 
-        st += sizeof(Gaussian);
-
-        if ((i + 1) % 5000 == 0) {
-            uart_puts("loaded ");
-            uart_putd(i + 1);
-            uart_puts(" gaussians\n");
+        pg.opacity[i] = rand_float(0.5f, 1.0f); // load opacity directly to projected Gaussian
+        
+        for (int j = 0; j < 16; j++) {
+            g.sh_x[j][i] = 0.0f;
+            g.sh_y[j][i] = 0.0f;
+            g.sh_z[j][i] = 0.0f;
         }
+        
+        float r = rand_float(0.2f, 1.0f);
+        float gr = rand_float(0.2f, 1.0f);
+        float b = rand_float(0.2f, 1.0f);
+        g.sh_x[0][i] = (r - 0.5f) / SH_C0;
+        g.sh_y[0][i] = (gr - 0.5f) / SH_C0;
+        g.sh_z[0][i] = (b - 0.5f) / SH_C0;
     }
-
-    x_avg /= num_gaussians;
-    y_avg /= num_gaussians;
-    z_avg /= num_gaussians;
-
-    *num_gaussians_ptr = num_gaussians;
-    *x_avg_ptr = x_avg;
-    *y_avg_ptr = y_avg;
-    *z_avg_ptr = z_avg;
-}
-
-void main() {
-    uint32_t t;
-    caches_enable();
-
-    const int MiB = 1024 * 1024;
-    arena_init(&data_arena, MiB * 230);
-
-    init_kernels();
-
-    uint32_t num_gaussians;
-    float x_avg, y_avg, z_avg;
-    read_gaussians(&num_gaussians, &x_avg, &y_avg, &z_avg);
-
-    // FLY
-    Vec3 cam_pos = { { x_avg - 0.1 * SCALE, y_avg, z_avg + 0.3 * SCALE } };
-    // Vec3 cam_pos = { { x_avg - 0.2 * SCALE, y_avg, z_avg + 0.5 * SCALE } };
-    // Vec3 cam_pos = { { x_avg - 0.5 * SCALE, y_avg, z_avg  } };
-
-    // CACTUS
-    // Vec3 cam_pos = { { 0.0f, -15.0f, 25.f } };
-
-    Vec3 cam_target = { { x_avg, y_avg, z_avg} };
-    Vec3 cam_up = { { 0.0f, 1.0f, 0.0f } };
-
-    Camera* c = arena_alloc_align(&data_arena, sizeof(Camera), 16);
-    init_camera(c, cam_pos, cam_target, cam_up, WIDTH, HEIGHT);
 
     DEBUG_D(num_gaussians);
 
@@ -565,11 +433,12 @@ void main() {
     uart_puts("COUNTING INTERSECTIONS...\n");
 
     // qpu
-    uint32_t* tiles_touched = arena_alloc_align(&data_arena, (num_gaussians + 1) * sizeof(uint32_t), 16 * sizeof(uint32_t));
-    uint32_t* gaussians_touched = arena_alloc_align(&data_arena, (NUM_TILES + 1) * sizeof(uint32_t), 16 * sizeof(uint32_t));
+    uint32_t* tiles_touched = arena_alloc_align(&data_arena, (num_gaussians + 1) * sizeof(uint32_t), 16);
+    uint32_t* gaussians_touched = arena_alloc_align(&data_arena, (NUM_TILES + 1) * sizeof(uint32_t), 16);
     memset(tiles_touched, 0, (num_gaussians + 1) * sizeof(uint32_t));
     memset(gaussians_touched, 0, (NUM_TILES + 1) * sizeof(uint32_t));
 
+    ProjectedGaussianPtr pg_all;
     count_intersections(&pg, num_gaussians,
             tiles_touched, &pg_all);
 
@@ -586,6 +455,8 @@ void main() {
     sort(&pg_all, total_intersections, &pg, gaussians_touched);
     uint32_t qpu_sort_t = sys_timer_get_usec() - t;
     DEBUG_D(qpu_sort_t);
+
+    // rpi_reset();
 
 
     uint32_t *fb;
@@ -608,8 +479,8 @@ void main() {
     uart_puts("RENDERING\n");
 
     kernel_reset_unifs(&render_k);
-    for (uint32_t q = 0; q < render_k.num_qpus; q++) {
-        kernel_load_unif(&render_k, q, render_k.num_qpus);
+    for (uint32_t q = 0; q < NUM_QPUS; q++) {
+        kernel_load_unif(&render_k, q, NUM_QPUS);
         kernel_load_unif(&render_k, q, NUM_TILES);
         kernel_load_unif(&render_k, q, q);
 
@@ -636,8 +507,6 @@ void main() {
     DEBUG_D(render_t);
 
     uart_puts("DONE RENDERING\n");
-
-    free_kernels();
 
     float MB_used = 1.0 * data_arena.size / MiB;
     DEBUG_F(MB_used);

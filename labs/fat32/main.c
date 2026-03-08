@@ -1,10 +1,12 @@
 #include "fat.h"
-#include "sd.h"
+#include "emmc.h"
 #include "uart.h"
 #include "lib.h"
+#include "gaussian.h"
+#include "debug.h"
 
 /* 8.3 filename: "NAME    EXT" (8 chars name, space-padded, then 3 chars extension) */
-#define FILE_NAME "TWEETS  CSV"
+#define FILE_NAME "FLY     PLY"
 
 int main(void)
 {
@@ -54,6 +56,57 @@ int main(void)
     }
     uart_putc('\n');
     uart_puts("\nDone.\n");
+
+    const char* vertex_count = "vertex ";
+    const char* end_header = "end_header\n";
+
+    int st = 0;
+    for (; ; st++) {
+        int f = 0;
+        for (int j = 0; j < 7; j++) {
+            if (data[st + j] != vertex_count[j]) {
+                f = 1;
+                break;
+            }
+        }
+
+        if (!f) {
+            break;
+        }
+    }
+    st += 7;
+    uint32_t cnt = 0;
+    while (data[st] != '\n') {
+        cnt = cnt * 10 + (data[st++] - '0');
+    }
+
+    DEBUG_D(cnt);
+
+    for (; ; st++) {
+        int f = 0;
+        for (int j = 0; j < 11; j++) {
+            if (data[st + j] != end_header[j]) {
+                f = 1;
+                break;
+            }
+        }
+
+        if (!f) {
+            break;
+        }
+    }
+
+    st += 11;
+
+    for (int i = 0; i < 10; i++) {
+        Gaussian g;
+        memcpy(&g, data + st, sizeof(Gaussian));
+        DEBUG_F(g.pos_x);
+        DEBUG_F(g.pos_y);
+        DEBUG_F(g.pos_z);
+
+        st += sizeof(Gaussian);
+    }
 
     rpi_reset();
     return 0;

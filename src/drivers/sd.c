@@ -108,7 +108,7 @@ unsigned long sd_scr[2], sd_ocr, sd_rca, sd_err, sd_hv;
  */
 int sd_status(unsigned int mask)
 {
-    int cnt = 500000; while((*EMMC_STATUS & mask) && !(*EMMC_INTERRUPT & INT_ERROR_MASK) && cnt--) sys_timer_delay_ms(1);
+    int cnt = 1000000; while((*EMMC_STATUS & mask) && !(*EMMC_INTERRUPT & INT_ERROR_MASK) && cnt--) sys_timer_delay_ms(1);
     return (cnt <= 0 || (*EMMC_INTERRUPT & INT_ERROR_MASK)) ? SD_ERROR : SD_OK;
 }
 
@@ -139,7 +139,7 @@ int sd_cmd(unsigned int code, unsigned int arg)
         code &= ~CMD_NEED_APP;
     }
     if(sd_status(SR_CMD_INHIBIT)) { uart_puts("ERROR: EMMC busy\n"); sd_err= SD_TIMEOUT;return 0;}
-    // uart_puts("EMMC: Sending command ");uart_hex(code);uart_puts(" arg ");uart_hex(arg);uart_puts("\n");
+    uart_puts("EMMC: Sending command ");uart_hex(code);uart_puts(" arg ");uart_hex(arg);uart_puts("\n");
     *EMMC_INTERRUPT=*EMMC_INTERRUPT; *EMMC_ARG1=arg; *EMMC_CMDTM=code;
     if(code==CMD_SEND_OP_COND) sys_timer_delay_ms(1000); else
     if(code==CMD_SEND_IF_COND || code==CMD_APP_CMD) sys_timer_delay_ms(100);

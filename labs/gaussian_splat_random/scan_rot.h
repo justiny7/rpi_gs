@@ -1,5 +1,5 @@
-#ifndef calc_bbox_H
-#define calc_bbox_H
+#ifndef scan_rot_H
+#define scan_rot_H
 
 #include <inttypes.h>
 
@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-extern uint32_t calc_bbox[172];
+extern uint32_t scan_rot[92];
 
 
 #ifdef __cplusplus

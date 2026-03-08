@@ -1,37 +1,19 @@
 .include <vc4.qinc>
 
 .set stride, ra0
-.set NUM_GAUSSIANS, ra1
+.set NUM_INTERSECTIONS, ra1
 .set qpu_num, ra2
 
-.set max_tile_width, ra7
-.set max_tile_height, ra8
-.set TILE_SIZE, 16 # assume tile size is 16
+.set arr, ra3
 
-.set screen_x, rb0
-.set screen_y, rb1
-.set radius, rb2
-
-.set tiles_touched, ra6
-
-.set base_row, ra3          # (qpu_num * 4)
-.set loop_counter, rb5
-
-.set temp_a0, ra10
-
+.set base_row, ra5          # (qpu_num * 4)
+.set loop_counter, rb9
 
 mov stride, unif
-mov NUM_GAUSSIANS, unif
+mov NUM_INTERSECTIONS, unif
 mov qpu_num, unif
 
-mov max_tile_width, unif
-mov max_tile_height, unif
-
-mov screen_x, unif
-mov screen_y, unif
-mov radius, unif
-
-mov tiles_touched, unif
+mov arr, unif
 
 
 .macro mem_to_vpm_vec16, addr_reg, offset
@@ -78,58 +60,6 @@ mov tiles_touched, unif
     mov dst_reg, vpm
 .endm
 
-.macro calc_bbox
-    mem_to_vpm_vec16 radius, 0
-    mem_to_vpm_vec16 screen_x, 1
-    mem_to_vpm_vec16 screen_y, 2
-
-    vpm_to_reg_vec16 r1, 0
-    vpm_to_reg_vec16 r2, 1
-
-    # mask off radius == 0
-    fsub.setf -, r1, 0.0
-
-    fsub r0, r2, r1
-    fmax r0, r0, 0.5
-    ftoi r0, r0
-    shr r3, r0, 4 # divide by TILE_SIZE
-    min r3, r3, max_tile_width
-    # sub r3, 1, r3
-
-    fadd r0, r2, r1
-    fmax r0, r0, 0.5
-    ftoi r0, r0
-    add r0, r0, TILE_SIZE - 1
-    shr r0, r0, 4 # divide by TILE_SIZE
-    min r0, r0, max_tile_width
-    # add temp_a0, r3, r0
-    sub r3, r0, r3
-    add temp_a0, r3, 1
-
-    vpm_to_reg_vec16 r2, 2
-
-    fsub r0, r2, r1
-    fmax r0, r0, 0.5
-    ftoi r0, r0
-    shr r3, r0, 4
-    min r3, r3, max_tile_height
-    # sub r3, 1, r3
-
-    fadd r0, r2, r1
-    fmax r0, r0, 0.5
-    ftoi r0, r0
-    add r0, r0, TILE_SIZE - 1
-    shr r0, r0, 4
-    min r0, r0, max_tile_height
-    # add r3, r3, r0
-    sub r3, r0, r3
-    add r3, r3, 1
-
-    mov r1, 0
-    mul24.ifnz r1, temp_a0, r3
-    reg_to_vpm_vec16 r1, 0
-    vpm_to_mem_vec16 tiles_touched, 0
-.endm
 
 # loop counter (qpu_num * SIMD_WIDTH += stride until >= NUM_GAUSSIANS)
 shl loop_counter, qpu_num, 4
@@ -138,17 +68,40 @@ shl loop_counter, qpu_num, 4
 shl base_row, qpu_num, 2
 
 :loop
-    calc_bbox
+    mem_to_vpm_vec16 arr, 0
+    vpm_to_reg_vec16 r3, 0
+
+    mov r1, elem_num
+    
+    # 0, 1,   2,   3,   4,   5,   ...
+    # 0, 0:1, 1:2, 2:3, 3:4, 4:5, ...
+    # 0, 0:1, 0:2, 0:3, 1:4, 2:5, ...
+    # 0, 0:1, 0:2, 0:3, 0:4, 0:5, ...
+    mov r2, r3 >> 1
+    sub.setf -, r1, 1
+    add.ifnc r3, r2, r3  # mask off elements less than 1
+
+    mov r2, r3 >> 2
+    sub.setf -, r1, 2
+    add.ifnc r3, r2, r3  # mask off elements less than 2
+
+    mov r2, r3 >> 4
+    sub.setf -, r1, 4
+    add.ifnc r3, r2, r3  # mask off elements less than 4
+
+    mov r2, r3 >> 8
+    sub.setf -, r1, 8
+    add.ifnc r3, r2, r3  # mask off elements less than 8
+
+    reg_to_vpm_vec16 r3, 0
+    vpm_to_mem_vec16 arr, 0
 
     # increment pointers += stride * sizeof(float), check if reached array end
     shl r0, stride, 2
-    add screen_x, screen_x, r0
-    add screen_y, screen_y, r0
-    add radius, radius, r0
-    add tiles_touched, tiles_touched, r0
+    add arr, arr, r0
 
     add r0, loop_counter, stride
-    sub.setf -, r0, NUM_GAUSSIANS
+    sub.setf -, r0, NUM_INTERSECTIONS
 
     brr.anyc -, :loop
     mov loop_counter, r0

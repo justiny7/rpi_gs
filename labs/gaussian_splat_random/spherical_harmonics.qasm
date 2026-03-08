@@ -123,18 +123,15 @@
     vpm_to_reg_vec16 y, 1
     vpm_to_reg_vec16 z, 2
 
-    # fsub r0, x, cam_x
-    fsub r0, cam_x, x
+    fsub r0, x, cam_x
     mov x, r0
     fmul r1, r0, r0
 
-    # fsub r0, y, cam_y
-    fsub r0, cam_y, y
+    fsub r0, y, cam_y
     fmul r2, r0, r0
     fadd r1, r1, r2
 
-    # fsub r3, z, cam_z
-    fsub r0, cam_z, z
+    fsub r3, z, cam_z
     fmul r2, r3, r3
     fadd r1, r1, r2
 

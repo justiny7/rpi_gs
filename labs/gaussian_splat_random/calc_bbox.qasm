@@ -90,40 +90,32 @@ mov tiles_touched, unif
     fsub.setf -, r1, 0.0
 
     fsub r0, r2, r1
-    fmax r0, r0, 0.5
+    fmax r0, r0, 0
     ftoi r0, r0
     shr r3, r0, 4 # divide by TILE_SIZE
-    min r3, r3, max_tile_width
-    # sub r3, 1, r3
+    sub r3, 1, r3
 
     fadd r0, r2, r1
-    fmax r0, r0, 0.5
     ftoi r0, r0
     add r0, r0, TILE_SIZE - 1
     shr r0, r0, 4 # divide by TILE_SIZE
     min r0, r0, max_tile_width
-    # add temp_a0, r3, r0
-    sub r3, r0, r3
-    add temp_a0, r3, 1
+    add temp_a0, r3, r0
 
     vpm_to_reg_vec16 r2, 2
 
     fsub r0, r2, r1
-    fmax r0, r0, 0.5
+    fmax r0, r0, 0
     ftoi r0, r0
     shr r3, r0, 4
-    min r3, r3, max_tile_height
-    # sub r3, 1, r3
+    sub r3, 1, r3
 
     fadd r0, r2, r1
-    fmax r0, r0, 0.5
     ftoi r0, r0
     add r0, r0, TILE_SIZE - 1
     shr r0, r0, 4
     min r0, r0, max_tile_height
-    # add r3, r3, r0
-    sub r3, r0, r3
-    add r3, r3, 1
+    add r3, r3, r0
 
     mov r1, 0
     mul24.ifnz r1, temp_a0, r3
