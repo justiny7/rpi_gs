@@ -1,6 +1,7 @@
 *.img
 *.DS_Store
 *.txt
+*.ppm
 
 **/build
 **/bin

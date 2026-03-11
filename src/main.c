@@ -5,8 +5,10 @@
 #include "gaussian_splat.h"
 #include "mailbox_interface.h"
 
-#define WIDTH 1280
-#define HEIGHT 720
+#define WIDTH 1024
+#define HEIGHT 1024
+// #define WIDTH 1280
+// #define HEIGHT 720
 // #define WIDTH 640
 // #define HEIGHT 480
 // #define WIDTH 256
@@ -19,6 +21,8 @@
 #define FILE_NAME "FLY     PLY"
 // #define FILE_NAME "CACTUS  PLY"
 // #define FILE_NAME "BONSAI  PLY"
+// #define FILE_NAME "GOLDORAKPLY"
+// #define FILE_NAME "MOTOR~44PLY"
 
 Arena data_arena;
 GaussianSplat gs;
@@ -51,7 +55,8 @@ void main() {
     // Interpolate circle around center
     float rad = 0.75;
     // float rad = 5.0;
-    float height = 1.0;
+    float height = 0.2;
+    // float height = 1.0;
     float angle = 0.0;
     while (1) {
         uart_puts("Angle: ");

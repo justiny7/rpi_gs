@@ -40,7 +40,6 @@ typedef struct {
 } Gaussian;
 */
 
-// /*
 typedef struct __attribute((packed, aligned(4))) {
     float pos_x;
     float pos_y;
@@ -56,7 +55,6 @@ typedef struct __attribute((packed, aligned(4))) {
     float rot_y;
     float rot_z;
 } Gaussian;
-// */
 
 typedef struct {
     Vec3 pos[MAX_GAUSSIANS];

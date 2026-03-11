@@ -21,7 +21,7 @@ typedef struct {
 } GaussianSplat;
 
 void gs_init(GaussianSplat* gs, Arena* data_arena, uint32_t* framebuffer, uint32_t num_qpus);
-void gs_free(GaussianSplat* gs);
+void gs_free_kernels();
 
 void gs_read_ply(GaussianSplat* gs, const char* filename,
         float* x_avg, float* y_avg, float* z_avg);

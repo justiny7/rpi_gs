@@ -54,8 +54,10 @@ void gs_set_camera(GaussianSplat* gs, Camera* c) {
 
     gs->c = c;
     gs->num_tiles = c->width * c->height / (TILE_SIZE * TILE_SIZE);
+
+    assert(gs->num_tiles <= 4096, "Can have at most 4096 tiles");
 }
-void gs_free(GaussianSplat* gs) {
+void gs_free_kernels() {
     kernel_free(&project_points_k);
     kernel_free(&sh_k);
     kernel_free(&bbox_k);
@@ -494,6 +496,10 @@ void gs_render(GaussianSplat* gs) {
 
     uint32_t arena_size = gs->data_arena->size;
 
+#ifdef VERBOSE
+    uart_puts("PREPROCESSING GAUSSIANS...\n");
+#endif
+
     t = sys_timer_get_usec();
     precompute_gaussians_qpu(gs);
     uint32_t qpu_t = sys_timer_get_usec() - t;
@@ -527,12 +533,12 @@ void gs_render(GaussianSplat* gs) {
     DEBUG_D(qpu_sort_t);
 
 #ifdef VERBOSE
-    uart_puts("RENDERING\n");
+    uart_puts("RENDERING...\n");
 #endif
 
     kernel_reset_unifs(&render_k);
-    for (uint32_t q = 0; q < render_k.num_qpus; q++) {
-        kernel_load_unif(&render_k, q, render_k.num_qpus);
+    for (uint32_t q = 0; q < gs->num_qpus; q++) {
+        kernel_load_unif(&render_k, q, gs->num_qpus);
         kernel_load_unif(&render_k, q, gs->num_tiles);
         kernel_load_unif(&render_k, q, q);
 
@@ -559,7 +565,7 @@ void gs_render(GaussianSplat* gs) {
     DEBUG_D(render_t);
 
 #ifdef VERBOSE
-    uart_puts("DONE RENDERING\n");
+    uart_puts("DONE RENDERING!\n");
 #endif
 
     arena_dealloc_to(gs->data_arena, arena_size);
