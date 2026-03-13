@@ -6,9 +6,9 @@
 void kernel_init(Kernel* kernel,
         uint32_t num_qpus, uint32_t num_unifs,
         uint32_t* code, uint32_t code_size) {
-    uint32_t total_size = code_size +
-        num_qpus * num_unifs * sizeof(uint32_t) + // code
-        num_qpus * 2 * sizeof(uint32_t) +         // unifs
+    uint32_t total_size = code_size +             // code
+        num_qpus * num_unifs * sizeof(uint32_t) + // unifs
+        num_qpus * 2 * sizeof(uint32_t) +         // mailbox
         num_qpus * sizeof(uint32_t) +             // unif counter
         48;                                       // padding
 
@@ -60,6 +60,6 @@ void kernel_load_unif_f(Kernel* kernel, uint32_t qpu, float val) {
 void kernel_load_unif_d(Kernel* kernel, uint32_t qpu, uint32_t val) {
     assert(qpu < kernel->num_qpus, "Load to invalid QPU");
     assert(kernel->cur_unif[qpu] < kernel->num_unifs, "Loading too many unifs");
-    memcpy(&kernel->unif[qpu * kernel->num_unifs + kernel->cur_unif[qpu]++], &val, sizeof(float));
+    memcpy(&kernel->unif[qpu * kernel->num_unifs + kernel->cur_unif[qpu]++], &val, sizeof(uint32_t));
 }
 
