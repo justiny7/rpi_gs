@@ -135,7 +135,7 @@ mov id, unif
     vpm_to_mem_vec16 id, 2
 .endm
 
-.macro calc_bbox
+.macro calc_tile
     add t0s, radius, pg_indices
     add t0s, screen_y, pg_indices
     add t0s, screen_x, pg_indices
@@ -235,7 +235,7 @@ shl base_row, qpu_num, 2
 :loop
     calc_indices
 
-    calc_bbox
+    calc_tile
 
     # increment pointers += stride * sizeof(float), check if reached array end
     shl r0, stride, 2

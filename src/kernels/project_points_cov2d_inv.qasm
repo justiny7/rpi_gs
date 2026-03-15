@@ -191,10 +191,10 @@ mov cov2d_inv_z, unif
     fadd tz_reg, tz_reg, r1
 .endm
 
-.macro calc_uv_and_J, offset0, offset1, offset2
+.macro calc_uv_and_J
     # move depth to VPM (can overrwrite pos)
     mov r2, tz_reg
-    reg_to_vpm_vec16 r2, offset0
+    reg_to_vpm_vec16 r2, 0
 
     # set clipping plane flags for radius
     mov r0, 0.1     # near plane
@@ -214,7 +214,7 @@ mov cov2d_inv_z, unif
     fmul r1, r1, tx_reg
     fmul r1, r1, r4
     fadd r3, r3, r1
-    reg_to_vpm_vec16 r3, offset1
+    reg_to_vpm_vec16 r3, 1
 
     # calculate v: load cy first (use r3 bc r0 is used in VPM move)
     mov r3, cy   # c->cy
@@ -222,7 +222,7 @@ mov cov2d_inv_z, unif
     fmul r1, r1, ty_reg
     fmul r1, r1, r4
     fadd r3, r3, r1
-    reg_to_vpm_vec16 r3, offset2
+    reg_to_vpm_vec16 r3, 2
 
     # calculate Jacobian
     mov r0, r4           # move 1/tz to r0
@@ -257,7 +257,7 @@ mov cov2d_inv_z, unif
     fadd dst_reg, dst_reg, r0
 .endm
 
-.macro calc_cov2d_inv, offset0, offset1, offset2
+.macro calc_cov2d_inv
     # start moving cov3d to memory
     # a, b, c, d
     mem_to_vpm_vec16 cov3da, 0
@@ -276,10 +276,6 @@ mov cov2d_inv_z, unif
     dot2 J10, Jc, Jd, w2c4, w2c8
     dot2 J11, Jc, Jd, w2c5, w2c9
     dot2 J12, Jc, Jd, w2c6, w2c10
-
-    # reg_to_vpm_vec16 J10, 0
-    # reg_to_vpm_vec16 J11, 1
-    # reg_to_vpm_vec16 J12, 2
 
     dot3 temp_a0, J00, J01, J02, temp_b0, temp_b1, temp_b2
     dot3 temp_a3, J10, J11, J12, temp_b0, temp_b1, temp_b2
@@ -408,7 +404,7 @@ shl base_row, qpu_num, 2
     nop
 
     # calculate screen_x, screen_y + move to VPM
-    calc_uv_and_J 0, 1, 2
+    calc_uv_and_J
 
     # write from VPM to mem for depth, screen_x, screen_y
     vpm_to_mem_vec16 depth, 0
@@ -416,7 +412,7 @@ shl base_row, qpu_num, 2
     vpm_to_mem_vec16 screen_y, 2
 
     # calculate cov2d inverse
-    calc_cov2d_inv 0, 1, 2
+    calc_cov2d_inv
 
     vpm_to_mem_vec16 cov2d_inv_x, 0
     vpm_to_mem_vec16 cov2d_inv_y, 1

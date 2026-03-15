@@ -93,8 +93,8 @@ mov tiles_touched, unif
     fmax r0, r0, 0.5
     ftoi r0, r0
     shr r3, r0, 4 # divide by TILE_SIZE
-    min r3, r3, max_tile_width
-    # sub r3, 1, r3
+    add r0, max_tile_width, 1  # since we do max-min+1, to truly zero out we need to min at max+1
+    min r3, r3, r0
 
     fadd r0, r2, r1
     fmax r0, r0, 0.5
@@ -102,7 +102,6 @@ mov tiles_touched, unif
     add r0, r0, TILE_SIZE - 1
     shr r0, r0, 4 # divide by TILE_SIZE
     min r0, r0, max_tile_width
-    # add temp_a0, r3, r0
     sub r3, r0, r3
     add temp_a0, r3, 1
 
@@ -112,8 +111,8 @@ mov tiles_touched, unif
     fmax r0, r0, 0.5
     ftoi r0, r0
     shr r3, r0, 4
-    min r3, r3, max_tile_height
-    # sub r3, 1, r3
+    add r0, max_tile_height, 1
+    min r3, r3, r0
 
     fadd r0, r2, r1
     fmax r0, r0, 0.5
@@ -121,7 +120,6 @@ mov tiles_touched, unif
     add r0, r0, TILE_SIZE - 1
     shr r0, r0, 4
     min r0, r0, max_tile_height
-    # add r3, r3, r0
     sub r3, r0, r3
     add r3, r3, 1
 
