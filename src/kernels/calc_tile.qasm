@@ -149,7 +149,7 @@ mov id, unif
 
     # calc tb
     fsub r0, r2, r1
-    fmax r0, r0, 0
+    fmax r0, r0, 0.5
     ftoi r0, r0
     shr tb, r0, 4 # divide by TILE_SIZE
 
@@ -158,6 +158,7 @@ mov id, unif
 
     # calc rb
     fadd r0, r2, r1
+    fmax r0, r0, 0.5
     ftoi r0, r0
     add r0, r0, TILE_SIZE - 1
     shr r0, r0, 4
@@ -167,7 +168,7 @@ mov id, unif
 
     # calc lb
     fsub r0, r2, r1
-    fmax r0, r0, 0
+    fmax r0, r0, 0.5
     ftoi r0, r0
     shr r0, r0, 4
 

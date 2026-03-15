@@ -311,6 +311,7 @@ void render_sort(GaussianSplat* gs) {
     Arena* arena = &gs->render_arena[active_arena];
     ProjectedGaussianPtr* pg_all = &gs->pg_all[active_arena];
 
+
     uint32_t* temp_key = arena_alloc_align(arena, gs->num_intersections * sizeof(uint32_t), 16 * sizeof(uint32_t));
     uint32_t* temp_id = arena_alloc_align(arena, gs->num_intersections * sizeof(uint32_t), 16 * sizeof(uint32_t));
 
@@ -318,6 +319,9 @@ void render_sort(GaussianSplat* gs) {
     uint32_t* cnt2 = arena_alloc_align(arena, (1 << 16) * sizeof(uint32_t), 16 * sizeof(uint32_t));
     memset(cnt, 0, (1 << 16) * sizeof(uint32_t));
     memset(cnt2, 0, (1 << 16) * sizeof(uint32_t));
+
+    gs->gaussians_touched[active_arena] = arena_alloc_align(arena, (gs->num_tiles + 1) * sizeof(uint32_t), 16 * sizeof(uint32_t));
+    memset(gs->gaussians_touched[active_arena], 0, (gs->num_tiles + 1) * sizeof(uint32_t));
 
     {   // pass 1
         for (uint32_t i = 0; i < gs->num_intersections; i++) {
@@ -344,7 +348,7 @@ void render_sort(GaussianSplat* gs) {
         for (int i = 1; i < (1 << 16); i++) {
             cnt2[i] += cnt2[i - 1];
         }
-
+        
         for (int i = gs->num_intersections - 1; i >= 0; i--) {
             uint32_t j = --cnt2[temp_key[i]];
             uint32_t id = temp_id[i];
@@ -363,6 +367,8 @@ void render_sort(GaussianSplat* gs) {
     for (uint32_t i = 0; i < gs->num_tiles; i++) {
         gs->gaussians_touched[active_arena][i + 1] += gs->gaussians_touched[active_arena][i];
     }
+
+    assert(gs->gaussians_touched[active_arena][gs->num_tiles] == gs->num_intersections, "Intersection mismatch");
 
     // wait for render to finish and clear inactive arena
     finish_render(gs);
@@ -435,6 +441,9 @@ void precompute_gaussians_qpu(GaussianSplat* gs) {
 
 void count_intersections(GaussianSplat* gs) {
     uint32_t active_arena = gs->active_arena;
+
+    gs->tiles_touched[active_arena] = arena_alloc_align(&gs->render_arena[active_arena], (gs->num_gaussians + 1) * sizeof(uint32_t), 16 * sizeof(uint32_t));
+    memset(gs->tiles_touched[active_arena], 0, (gs->num_gaussians + 1) * sizeof(uint32_t));
 
     /////////// CALCULATE BBOX
     kernel_reset_unifs(&bbox_k);
@@ -521,12 +530,6 @@ void gs_render(GaussianSplat* gs) {
             (active_arena * size); // offset by size if active_arena = 1
         arena_init(arena, buf, size);
     }
-
-    gs->tiles_touched[active_arena] = arena_alloc_align(arena, (gs->num_gaussians + 1) * sizeof(uint32_t), 16 * sizeof(uint32_t));
-    gs->gaussians_touched[active_arena] = arena_alloc_align(arena, (gs->num_tiles + 1) * sizeof(uint32_t), 16 * sizeof(uint32_t));
-
-    memset(gs->tiles_touched[active_arena], 0, (gs->num_gaussians + 1) * sizeof(uint32_t));
-    memset(gs->gaussians_touched[active_arena], 0, (gs->num_tiles + 1) * sizeof(uint32_t));
 
     count_intersections(gs);
 
