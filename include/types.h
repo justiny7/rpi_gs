@@ -1,6 +1,8 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#include <stdbool.h>
+
 typedef union {
     struct { float x, y, z; };
     float m[3];
@@ -27,6 +29,7 @@ typedef union {
 // Vec3
 float vec3_len(Vec3 v);
 float vec3_dot(Vec3 a, Vec3 b);
+bool vec3_same(Vec3 a, Vec3 b);
 
 Vec3 vec3_add(Vec3 a, Vec3 b);
 Vec3 vec3_sub(Vec3 a, Vec3 b);

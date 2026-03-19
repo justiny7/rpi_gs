@@ -21,15 +21,16 @@
 
 #define NUM_QPUS 12
 
-// #define VERBOSE
+#define VERBOSE
 
 const int MiB = 1024 * 1024;
 Arena data_arena;
 GaussianSplat gs;
-bool rendering;
+bool rendering, spiral;
 uint32_t* pixels;
 uint32_t ply_cluster, filesize;
 float cur_radius, calc_radius;
+float theta, phi_t;
 
 // UART interrupt to stop rendering + zoom controls
 void __attribute__((interrupt("IRQ"))) uart_irq_handler() {
@@ -45,34 +46,50 @@ void __attribute__((interrupt("IRQ"))) uart_irq_handler() {
                     mem_barrier_dsb();
                 } else if (c == ' ') {
                     cur_radius = calc_radius;
-                } else if (c == 'w') {
+                } else if (c == 'i') {
                     cur_radius = max(cur_radius * 0.9f, calc_radius * 0.66);
-                } else if (c == 's') {
+                } else if (c == 'k') {
                     cur_radius = min(cur_radius * 1.1f, calc_radius / 0.66);
+                } else if (c == 'c') {
+                    spiral = !spiral;
+                    if (phi_t > 0.5 * M_PI) {
+                        phi_t = phi_t * 2 - 0.5 * M_PI;
+                    }
+                }
+
+                if (!spiral) {
+                    if (c == 'w') {
+                        phi_t = max(phi_t - 0.1f, -0.5 * M_PI);
+                    } else if (c == 's') {
+                        phi_t = min(phi_t + 0.1f, 0.5 * M_PI);
+                    } else if (c == 'a') {
+                        theta += 0.1;
+                    } else if (c == 'd') {
+                        theta -= 0.1;
+                    }
                 }
             }
         }
+    } else {
+        panic("Undefined IRQ\n");
     }
 }
 
-Vec3 spiral_camera(Vec3 center, float radius, bool reset) {
-    static float theta = 0.f, t = 0.f;
+Vec3 spiral_camera(Vec3 center, float radius) {
     static const float dt = 0.1f;
     static const float omega = 4.0f;
 
-    if (reset) {
-        theta = t = 0.0f;
+    float phi = M_PI * 0.5f + (M_PI * 0.25f) * sinf(phi_t);
+    if (spiral) {
+        theta += omega * dt;
+        phi_t += dt;
+        while (phi_t > M_PI) phi_t -= 2.0f * M_PI;
     }
-
-    float phi = M_PI * 0.5f + (M_PI * 0.25f) * sinf(t);
-    theta += omega * dt;
 
     Vec3 p;
     p.x = center.x + radius * sinf(phi) * cosf(theta);
     p.y = center.y + radius * cosf(phi);
     p.z = center.z + radius * sinf(phi) * sinf(theta);
-
-    t += dt;
 
     return p;
 }
@@ -100,18 +117,18 @@ void render_loop() {
     mem_barrier_dsb();
 
     // Orbit around sphere
-    bool reset = true;
     cur_radius = calc_radius;
+    spiral = true;
+    theta = phi_t = 0.0f;
     while (rendering) {
 #ifdef VERBOSE
         uint32_t t = sys_timer_get_usec();
 #endif
 
-        Vec3 cam_pos = spiral_camera(center, cur_radius, reset);
+        Vec3 cam_pos = spiral_camera(center, cur_radius);
         init_camera(c, cam_pos, center, cam_up, WIDTH, HEIGHT);
 
-        gs_set_camera(&gs, c);
-        gs_render(&gs);
+        gs_render(&gs, c);
 
 #ifdef VERBOSE
         uint32_t render_t = sys_timer_get_usec() - t;
@@ -119,8 +136,6 @@ void render_loop() {
         uart_putd(render_t);
         uart_puts("\n");
 #endif
-
-        reset = false;
     }
 
     free_to(heap_size);
@@ -145,7 +160,8 @@ void flip_row(FontSettings* fs, uint32_t row) {
 void menu_loop() {
     uart_puts("INSTRUCTIONS:\n");
     uart_puts("- Use W/S + Enter to select a model, or Q to quit\n");
-    uart_puts("- Use W/S to zoom in/out, Space to reset zoom, or Q to quit\n");
+    uart_puts("- Use I/K to zoom in/out, Space to reset zoom, or Q to quit\n");
+    uart_puts("- Use C to toggle manual control, WASD to control camera\n");
     uint32_t num_files;
     uint8_t* lfns;
     fatdir_t* ply_files;

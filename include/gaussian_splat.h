@@ -32,7 +32,6 @@ void gs_free_kernels();
 
 void gs_read_ply(GaussianSplat* gs, uint32_t ply_cluster, uint32_t filesize,
         Vec3* center, float* radius);
-void gs_render(GaussianSplat* gs);
-void gs_set_camera(GaussianSplat* gs, Camera* c);
+void gs_render(GaussianSplat* gs, Camera* c);
 
 #endif

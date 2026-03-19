@@ -8,6 +8,9 @@ float vec3_len(Vec3 v) {
 float vec3_dot(Vec3 a, Vec3 b) {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
+bool vec3_same(Vec3 a, Vec3 b) {
+    return a.x == b.x && a.y == b.y && a.z == b.z;
+}
 
 Vec3 vec3_add(Vec3 a, Vec3 b) {
     Vec3 res = { { a.x + b.x, a.y + b.y, a.z + b.z } };

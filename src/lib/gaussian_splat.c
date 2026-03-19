@@ -16,7 +16,9 @@
 #include "scan_rot.h"
 #include "scan_sum.h"
 
-// #define DEBUG
+#include <stddef.h>
+
+#define DEBUG
 #include "debug.h"
 
 static Kernel project_points_k, sh_k, bbox_k, tile_k, render_k;
@@ -44,6 +46,7 @@ void gs_init(GaussianSplat* gs, Arena* data_arena, uint32_t* framebuffer, uint32
     gs->data_arena = data_arena;
     gs->num_qpus = num_qpus;
     gs->framebuffer = framebuffer;
+    gs->c = NULL;
 
     gs_reset_arenas(gs);
 }
@@ -52,7 +55,7 @@ void gs_reset_arenas(GaussianSplat* gs) {
     gs->render_arena[1].capacity = 0;
     gs->active_arena = 1;
 }
-void gs_set_camera(GaussianSplat* gs, Camera* c) {
+static void gs_set_camera(GaussianSplat* gs, Camera* c) {
     assert((c->width & 0xF) == 0, "Width must be divisble by 16");
     assert((c->height & 0xF) == 0, "Height must be divisble by 16");
 
@@ -466,8 +469,9 @@ void count_intersections(GaussianSplat* gs) {
     kernel_execute(&tile_k);
 }
 
+void gs_render(GaussianSplat* gs, Camera* c) {
+    gs_set_camera(gs, c);
 
-void gs_render(GaussianSplat* gs) {
 #ifdef VERBOSE
     uint32_t t;
     uart_puts("PREPROCESSING GAUSSIANS...\n");
