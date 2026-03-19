@@ -45,3 +45,7 @@ void qpu_wait(uint32_t num_qpus) {
     // Busy wait polling
     while (((GET32(V3D_SRQCS) >> 16) & 0xFF) != num_qpus);
 }
+void qpu_block() {
+    // qpu_wait on number of qpu requests made
+    qpu_wait((GET32(V3D_SRQCS) >> 8) & 0xFF);
+}

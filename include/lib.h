@@ -1,6 +1,8 @@
 #ifndef LIB_H
 #define LIB_H
 
+#include "armv6_asm.h"
+
 #include <stdint.h>
 #include <stdbool.h>
 

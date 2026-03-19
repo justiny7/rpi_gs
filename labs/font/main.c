@@ -21,11 +21,14 @@ void main() {
     display_char(&fs, 'a', 0, 0);
 
     const char* s = "qwertyuiopasdfghjklzxcvbnm";
-    display_text(&fs, s, 26, 30, 4);
+    display_text(&fs, s, 26, 50, 4);
+
+    const char* sss = "QWERTYUIOPASDFGHJKLZXCVBNM";
+    display_text(&fs, sss, 26, 100, 4);
 
     const char* ss = "0123456789";
-    display_text(&fs, ss, 10, 60, 4);
+    display_text(&fs, ss, 10, 150, 4);
 
     const char* test = "test.ply";
-    display_text(&fs, test, 8, 90, 4);
+    display_text(&fs, test, 8, 200, 4);
 }

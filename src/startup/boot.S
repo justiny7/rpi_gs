@@ -50,8 +50,8 @@ halt:
 _interrupt_table:
     ldr pc, =reset_vector
     ldr pc, =undefined_instruction_vector
-    ldr pc, =software_interrupt_vector
-    ldr pc, =prefetch_abort_vector
+    ldr pc, swi_handler_ptr
+    ldr pc, prefetch_abort_handler_ptr
     ldr pc, =data_abort_vector
     ldr pc, =reset_vector
     ldr pc, interrupt_handler_ptr
@@ -60,5 +60,11 @@ _interrupt_table:
 .global interrupt_handler_ptr
 interrupt_handler_ptr: .word interrupt_vector
 
+.global prefetch_abort_handler_ptr
+prefetch_abort_handler_ptr: .word prefetch_abort_vector
+
+.global swi_handler_ptr
+swi_handler_ptr: .word software_interrupt_vector
+
 reset_vector:
-    bl halt
+    bl rpi_reset

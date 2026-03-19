@@ -31,8 +31,7 @@ void uart_init() {
     // default high
     PUT32(AUX_MU_MCR_REG, 0);
 
-    // clear FIFOs
-    PUT32(AUX_MU_IIR_REG, 6);
+    uart_clear_fifos();
 
     uart_set_baudrate(UART_BAUDRATE_PRESCALE);
     uart_enable();
@@ -64,6 +63,9 @@ void uart_tx_enable() {
 }
 void uart_disable() {
     PUT32(AUX_MU_CNTL_REG, 0);
+}
+void uart_clear_fifos() {
+    PUT32(AUX_MU_IIR_REG, 6);
 }
 
 void uart_disable_interrupts() {

@@ -7,6 +7,7 @@
 #include "fat.h"
 #include "display_font.h"
 #include "uart.h"
+#include "thread.h"
 
 // #define WIDTH 1024
 // #define HEIGHT 1024
@@ -20,58 +21,116 @@
 // #define HEIGHT 96
 
 #define NUM_QPUS 12
+#define INSTRUCTIONS_VIRTUAL_OFFSET (HEIGHT * 2)
 
 #define VERBOSE
 
 const int MiB = 1024 * 1024;
 Arena data_arena;
 GaussianSplat gs;
+FontSettings fs;
 bool rendering, spiral;
+uint32_t instructions;
+
 uint32_t* pixels;
 uint32_t ply_cluster, filesize;
 float cur_radius, calc_radius;
 float theta, phi_t;
 
+volatile Thread menu_thread, render_thread, instructions_thread;
+volatile Thread* current_thread;
+volatile Thread* next_thread;
+
+void __attribute__((interrupt("IRQ"))) irq_handler();
+void __attribute__((interrupt("SWI"))) svc_handler();
+void start_thread(volatile uint32_t* sp);
+uint32_t get_sp();
+
 // UART interrupt to stop rendering + zoom controls
-void __attribute__((interrupt("IRQ"))) uart_irq_handler() {
+void scheduler() {
     if (uart_has_interrupt()) {
         uint32_t aux_irq = GET32(AUX_IRQ);
         if (aux_irq & 1) {
             uint32_t iir = GET32(AUX_MU_IIR_REG);
             if (((iir >> 1) & 3) == 0b10) {
                 uint8_t c = GET32(AUX_MU_IO_REG) & 0xFF;
-                if (c == 'q') {
-                    rendering = false;
-                    uart_disable_interrupts();
-                    mem_barrier_dsb();
-                } else if (c == ' ') {
-                    cur_radius = calc_radius;
-                } else if (c == 'i') {
-                    cur_radius = max(cur_radius * 0.9f, calc_radius * 0.66);
-                } else if (c == 'k') {
-                    cur_radius = min(cur_radius * 1.1f, calc_radius / 0.66);
-                } else if (c == 'c') {
-                    spiral = !spiral;
-                    if (phi_t > 0.5 * M_PI) {
-                        phi_t = phi_t * 2 - 0.5 * M_PI;
-                    }
-                }
+                if (instructions != INSTRUCTIONS_VIRTUAL_OFFSET) {
+                    // instructions thread
+                    if (c == 'h') {
+                        // reset virtual offset
+                        mbox_framebuffer_set_virtual_offset(0, instructions);
+                        instructions = INSTRUCTIONS_VIRTUAL_OFFSET;
 
-                if (!spiral) {
-                    if (c == 'w') {
-                        phi_t = max(phi_t - 0.1f, -0.5 * M_PI);
-                    } else if (c == 's') {
-                        phi_t = min(phi_t + 0.1f, 0.5 * M_PI);
-                    } else if (c == 'a') {
-                        theta += 0.1;
-                    } else if (c == 'd') {
-                        theta -= 0.1;
+                        if (rendering) {
+                            next_thread = &render_thread;
+                        } else {
+                            next_thread = &menu_thread;
+                            uart_disable_interrupts();
+                            mem_barrier_dsb();
+                        }
+                        return;
+                    }
+
+                } else if (rendering) {
+                    // rendering thread
+                    if (c == 'q') {
+                        rendering = false;
+                        next_thread = &menu_thread;
+
+                        uart_disable_interrupts();
+                        mem_barrier_dsb();
+                        return;
+                    }
+                    if (c == 'h') {
+                        uint32_t _;
+                        mbox_framebuffer_get_virtual_offset(&_, &instructions);
+                        mbox_framebuffer_set_virtual_offset(0, INSTRUCTIONS_VIRTUAL_OFFSET);
+                        next_thread = &instructions_thread;
+                        return;
+                    }
+
+                    if (c == ' ') {
+                        cur_radius = calc_radius;
+                    } else if (c == 'i') {
+                        cur_radius = max(cur_radius * 0.9f, calc_radius * 0.66);
+                    } else if (c == 'k') {
+                        cur_radius = min(cur_radius * 1.1f, calc_radius / 0.66);
+                    } else if (c == 'c') {
+                        spiral = !spiral;
+                        if (phi_t > 0.5 * M_PI) {
+                            phi_t = phi_t * 2 - 0.5 * M_PI;
+                        }
+                    }
+
+                    if (!spiral) {
+                        if (c == 'w') {
+                            phi_t = max(phi_t - 0.1f, -0.5 * M_PI);
+                        } else if (c == 's') {
+                            phi_t = min(phi_t + 0.1f, 0.5 * M_PI);
+                        } else if (c == 'a') {
+                            theta += 0.1;
+                        } else if (c == 'd') {
+                            theta -= 0.1;
+                        }
                     }
                 }
             }
         }
+
+        next_thread = current_thread;
     } else {
-        panic("Undefined IRQ\n");
+        // only cooperative switches are menu -> render and menu -> instructions
+        if (rendering) {
+            next_thread = &render_thread;
+        } else {
+            uint32_t _;
+            mbox_framebuffer_get_virtual_offset(&_, &instructions);
+            mbox_framebuffer_set_virtual_offset(0, INSTRUCTIONS_VIRTUAL_OFFSET);
+
+            uart_enable_rx_interrupts();
+            mem_barrier_dsb();
+            next_thread = &instructions_thread;
+        }
     }
 }
 
@@ -94,10 +153,30 @@ Vec3 spiral_camera(Vec3 center, float radius) {
     return p;
 }
 
-void render_loop() {
-    uint32_t heap_size = heap_get_size();
-    uint32_t data_size = data_arena.size;
+void instructions_loop() {
+    // display instructions
+    const char* s[] = {
+        "INSTRUCTIONS",
+        "- In menu, use I/K + Enter to select a model, or Q to quit",
+        "- In renderer, use I/K to zoom, Space to reset zoom,",
+        "  C + WASD to toggle camera control, and Q to quit to menu",
+        "- Use H to toggle this help menu",
+    };
 
+    for (uint32_t i = 0; i < 5; i++) {
+        uint32_t l = 0;
+        for (; s[i][l]; l++);
+
+        display_text(&fs, (const uint8_t*) s[i], l,
+                i * (FONT_HEIGHT + 1) * fs.scale + INSTRUCTIONS_VIRTUAL_OFFSET, 0);
+    }
+
+    // just an infinite loop bc it's just switching a
+    // virtual framebuffer offset (handled in scheduler)
+    while (1);
+}
+
+void render_loop() {
 #ifdef VERBOSE
     uart_puts("Reading PLY...\n");
 #endif
@@ -112,7 +191,10 @@ void render_loop() {
 #endif
     Camera* c = arena_alloc_align(&data_arena, sizeof(Camera), 16);
 
-    // enable UART interrupts
+    // enable UART interrupts (don't wanna interrupt SD card reading)
+    // also clear cache in case user was inputting stuff
+    uart_flush_tx();
+    uart_clear_fifos();
     uart_enable_rx_interrupts();
     mem_barrier_dsb();
 
@@ -120,7 +202,7 @@ void render_loop() {
     cur_radius = calc_radius;
     spiral = true;
     theta = phi_t = 0.0f;
-    while (rendering) {
+    while (1) {
 #ifdef VERBOSE
         uint32_t t = sys_timer_get_usec();
 #endif
@@ -137,14 +219,6 @@ void render_loop() {
         uart_puts("\n");
 #endif
     }
-
-    free_to(heap_size);
-    arena_dealloc_to(&data_arena, data_size);
-    gs_reset_arenas(&gs);
-
-    mbox_framebuffer_set_virtual_offset(0, 0);
-    memset(pixels, 0, HEIGHT * WIDTH * 2 * sizeof(uint32_t));
-    mmu_flush_dcache();
 }
 
 void flip_row(FontSettings* fs, uint32_t row) {
@@ -158,32 +232,29 @@ void flip_row(FontSettings* fs, uint32_t row) {
     mmu_flush_dcache();
 }
 void menu_loop() {
-    uart_puts("INSTRUCTIONS:\n");
-    uart_puts("- Use W/S + Enter to select a model, or Q to quit\n");
-    uart_puts("- Use I/K to zoom in/out, Space to reset zoom, or Q to quit\n");
-    uart_puts("- Use C to toggle manual control, WASD to control camera\n");
     uint32_t num_files;
     uint8_t* lfns;
     fatdir_t* ply_files;
     fat_get_plys(&ply_files, &lfns, &num_files);
 
-    FontSettings fs;
-    fs.scale = 4;
-    fs.height = HEIGHT;
+    fs.scale = 2;
+    fs.height = HEIGHT * 3;
     fs.width = WIDTH;
     fs.color = 0x00FFFFFF;
     fs.fb = pixels;
 
+    // display instructions in the beginning
+    thread_yield();
+
     while (1) {
+        // re-initialize render thread
+        thread_init(&render_thread, render_loop);
+
         for (uint32_t i = 0; i < num_files; i++) {
             uint32_t offset = i * MAX_LFN_LEN;
             if (lfns[offset]) {
                 int l = 0;
-                for (; lfns[offset + l] && lfns[offset + l] != '.'; l++) {
-                    if (lfns[offset + l] >= 'A' && lfns[offset + l] <= 'Z') {
-                        lfns[offset + l] += 'a' - 'A';
-                    }
-                }
+                for (; lfns[offset + l] && lfns[offset + l] != '.'; l++);
                 display_text(&fs, &lfns[offset], l, i * (FONT_HEIGHT + 1) * fs.scale, 0);
             } else {
                 for (int j = 0; j < 8; j++) {
@@ -201,14 +272,16 @@ void menu_loop() {
         while (1) {
             uint8_t input = uart_getc();
 
-            if (input == 's') {
+            if (input == 'k') {
                 flip_row(&fs, selection);
                 selection = (selection + 1) % num_files;
                 flip_row(&fs, selection);
-            } else if (input == 'w') {
+            } else if (input == 'i') {
                 flip_row(&fs, selection);
                 selection = (selection + num_files - 1) % num_files;
                 flip_row(&fs, selection);
+            } else if (input == 'h') {
+                thread_yield();
             } else if (input == '\n') {
                 break;
             } else if (input == 'q') {
@@ -220,15 +293,34 @@ void menu_loop() {
         filesize = ply_files[selection].size;
         rendering = true;
 
-        render_loop();
+        uint32_t heap_size = heap_get_size();
+        uint32_t data_size = data_arena.size;
+
+        thread_yield();
+
+        // wait for QPU kernels to finish
+        qpu_block();
+
+        // reset memory
+        free_to(heap_size);
+        arena_dealloc_to(&data_arena, data_size);
+        gs_reset_arenas(&gs);
+
+        mbox_framebuffer_set_virtual_offset(0, 0);
+        memset(pixels, 0, HEIGHT * WIDTH * 2 * sizeof(uint32_t));
+        mmu_flush_dcache();
     }
 }
 
 void main() {
-    // Install UART interrupts
+    // Install ISRs
     extern uint32_t interrupt_handler_ptr;
-    interrupt_handler_ptr = (uint32_t) uart_irq_handler;
+    interrupt_handler_ptr = (uint32_t) irq_handler;
 
+    extern uint32_t swi_handler_ptr;
+    swi_handler_ptr = (uint32_t) svc_handler;
+
+    // Init MMU
     page_table_init();
     mmu_init();
     mmu_enable();
@@ -253,7 +345,7 @@ void main() {
 #endif
 
     uint32_t* fb;
-    mbox_framebuffer_init(WIDTH, HEIGHT, WIDTH, HEIGHT * 2, 32, &fb); // double buffer
+    mbox_framebuffer_init(WIDTH, HEIGHT, WIDTH, HEIGHT * 3, 32, &fb); // double buffer
     pixels = (uint32_t*) TO_CPU(fb);
 
 #ifdef VERBOSE
@@ -274,7 +366,13 @@ void main() {
 #endif
     gs_init(&gs, &data_arena, pixels, NUM_QPUS);
 
-    menu_loop();
+    // Init threads
+    thread_init(&menu_thread, menu_loop);
+    thread_init(&instructions_thread, instructions_loop);
 
+    current_thread = &menu_thread;
+    start_thread(current_thread->sp);
+
+    // should never get here
     rpi_reset();
 }

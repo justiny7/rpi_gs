@@ -18,7 +18,7 @@
 
 #include <stddef.h>
 
-#define DEBUG
+// #define DEBUG
 #include "debug.h"
 
 static Kernel project_points_k, sh_k, bbox_k, tile_k, render_k;
@@ -443,7 +443,6 @@ void count_intersections(GaussianSplat* gs) {
 
     ProjectedGaussianPtr* pg_all = &gs->pg_all[active_arena];
     init_projected_gaussian_ptr(pg_all, &gs->render_arena[active_arena], gs->num_intersections);
-    DEBUG_D(gs->num_intersections);
 
     kernel_reset_unifs(&tile_k);
     for (uint32_t q = 0; q < gs->num_qpus; q++) {

@@ -2,6 +2,7 @@
 #include "sys_timer.h"
 #include "gpio.h"
 #include "lib.h"
+#include "uart.h"
 
 // Raspberry Pi EMMC driver adapted from Low Level Devel:
 // https://github.com/rockytriton/LLD
@@ -816,7 +817,10 @@ int emmc_read(u32 sector, u8 *buffer, u32 size) {
     /*   return -1; */
     /* } */
 
+    mem_barrier_dsb();
     bool success = do_data_command(false, buffer, size, sector);
+    mem_barrier_dsb();
+
     if (!success) {
         uart_puts("EMMC_ERR: READ FAILED: sector=");
         uart_putd(sector);
@@ -832,7 +836,9 @@ int emmc_read(u32 sector, u8 *buffer, u32 size) {
 int emmc_write(u32 sector, u8 *buffer, u32 size) {
     assert(size % 512 == 0, "emmc write size is not multiple of 512");
 
+    mem_barrier_dsb();
     int r = do_data_command(true, buffer, size, sector);
+    mem_barrier_dsb();
     if (!r) {
         uart_puts("EMMC_ERR: WRITE FAILED: ");
         uart_putd(r);
@@ -843,6 +849,8 @@ int emmc_write(u32 sector, u8 *buffer, u32 size) {
 }
 
 bool emmc_init() {
+    mem_barrier_dsb();
+
     gpio_select((Pin){.p_num = 34}, GPIO_INPUT);
     gpio_select((Pin){.p_num = 35}, GPIO_INPUT);
     gpio_select((Pin){.p_num = 36}, GPIO_INPUT);
@@ -876,6 +884,8 @@ bool emmc_init() {
         sys_timer_delay_ms(100);
         uart_puts("EMMC_WARN: Failed to reset card, trying again...\n");
     }
+
+    mem_barrier_dsb();
 
     if (!success) {
         return false;

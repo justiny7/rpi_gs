@@ -51,6 +51,7 @@ void uart_rx_enable();
 void uart_tx_enable();
 void uart_disable();
 
+void uart_clear_fifos();
 void uart_disable_interrupts();
 void uart_enable_rx_interrupts();
 bool uart_has_interrupt();
